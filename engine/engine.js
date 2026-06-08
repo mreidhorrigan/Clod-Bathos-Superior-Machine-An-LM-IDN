@@ -380,6 +380,14 @@
   // ---- APPRAISE: one combined LLM call → { transition, signals, deltas } ----
   IDNEngine.prototype._appraise = async function (userText) {
     var elig = this.eligibleTransitions();
+    // DETERMINISTIC HOSTILITY (mirror of vetoHostile): overt hostile language + a hostile
+    // exit → take it, SKIP the model. Guarantees rudeness is booted even when the router
+    // misses the insult; a polite line can never reach it (it has no hostile words).
+    var hostileTx = elig.filter(function (t) { return t.hostile; })[0];
+    if (hostileTx && HOSTILE_RE.test(userText || "")) {
+      this.lastAppraisal = { transition: hostileTx.id, kind: "hostile-forced" };
+      return { transition: hostileTx, kind: "hostile", signals: {}, deltas: {} };
+    }
     var signals = this._signalsFor(this.node());
     var numeric = this._numericFor();
 
