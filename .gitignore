@@ -1,0 +1,15 @@
+# OS cruft
+.DS_Store
+
+# Generated build output (created by build.py — never hand-edited)
+dist/
+
+# Logs / scratch
+*.log
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Local, machine-specific tooling settings
+.claude/settings.local.json
