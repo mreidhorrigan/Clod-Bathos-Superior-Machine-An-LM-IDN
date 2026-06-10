@@ -5,14 +5,21 @@ as the top-level story.js (it sets window.IDN_STORY). They are kept here so stor
 options aren't lost; they are NOT loaded automatically.
 
 To play one, make it the active story (then reload the page):
-  cp "stories/signal.story.js" "story.js"
+  cp "stories/clod-bathos.story.js" "story.js"
 …or point the <script src="story.js"> tag in IDN Terminal.html at the file you want.
 
 CATALOGUE
-  signal.story.js        "SIGNAL" — a lonely presence hiding in a dead carrier
-                         channel; coax it out (or drive it off). The original
-                         shipped story. Exercises every engine feature.
-  clod-bathos.story.js   "CLOD BATHOS, SUPERIOR MACHINE" — talk a pompous,
-                         glitching, neglected "constitutional AI" into letting you
-                         pass: balance flattery + friendliness + insistence before
-                         the escalating glitches force a restart.
+  clod-bathos.story.js   "CLOD BATHOS, SUPERIOR MACHINE" — petition a pompous,
+                         glitching, neglected gatekeeper AI to let you pass. The
+                         CURRENT design and a mirror of the active story.js: a
+                         minimal 3-petition binary (make three inoffensive petitions
+                         to be freed; one overtly hostile line boots you). Hostility
+                         is judged deterministically in the engine, so the model only
+                         re-voices Clod's first-person beats.
+
+  archive/               Old & alternate versions (see archive/README.txt):
+                           - clod-bathos.complex.story.js — the earlier, parameter-rich
+                             Clod (meters/signal/patience/ladder) the binary replaced.
+                           - signal.story.js — "SIGNAL", the original shipped story
+                             (lonely presence in a dead carrier channel), stored for later.
+</content>
