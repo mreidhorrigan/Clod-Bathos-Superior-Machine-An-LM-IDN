@@ -57,15 +57,17 @@ works*; this file is *where things stand* and *what's next*.
   full async `takeTurn()` runs headless when the LLM provider is synchronous.
 
 ### Version control
-The project is now a **git repo** (branch `main`, working tree clean). Two commits:
+The project is a **git repo** (branch `main`), pushed to
+`github.com/mreidhorrigan/Clod-Bathos-Superior-Machine-An-LM-IDN`. Key commits
+(hashes are post-2026-06-10 history scrub, which removed stray session logs):
 
 | Commit | What |
 |---|---|
-| `8c11ae7` **(HEAD)** | Radically simplify Clod to a 3-interaction binary — the **active** design. |
-| `b66998d` | Baseline: the **complex** Clod Bathos (meters, `approach` signal, patience, the forward ladder, promise-to-return, loneliness arc) — preserved before the simplification. |
+| `ac738dc` | Radically simplify Clod to a 3-interaction binary — the **active** design. |
+| `a30477f` | Baseline: the **complex** Clod Bathos (meters, `approach` signal, patience, the forward ladder, promise-to-return, loneliness arc) — preserved before the simplification. |
 
-- **Recover the rich version:** `git checkout b66998d -- story.js engine/engine.js`
-  (or `git checkout b66998d` to view the whole baseline).
+- **Recover the rich version:** `git checkout a30477f -- story.js engine/engine.js`
+  (or `git checkout a30477f` to view the whole baseline).
 - `.gitignore` excludes `dist/`, `.DS_Store`, `*.log`, `__pycache__/`, `.claude/settings.local.json`.
 
 ### Active story: "CLOD BATHOS, SUPERIOR MACHINE" — radically simplified (MVP)
@@ -249,15 +251,24 @@ Wrap the web build as a desktop app; could bundle a runtime. Heaviest; future op
 - [ ] **Pin the WebLLM version** (currently `esm.run` = latest) for reproducibility, e.g.
       `https://esm.run/@mlc-ai/web-llm@<ver>` in `engine/providers/webllm.js`.
 - [ ] **Add a WebGPU/browser landing gate** (friendly "open in Chrome/Edge" first-screen check).
-- [ ] **Pick a host + test the deployed flow** end-to-end in Chrome (fresh profile = real first-load UX).
+- [x] (done 2026-06-10) **Pick a host**: GitHub Pages, deployed by **`python3
+      deploy_pages.py`** (builds `dist/web` → force-pushes the `gh-pages` branch; re-run to
+      redeploy). ONE manual step remains: once the repo is PUBLIC (free-plan Pages needs
+      that), enable Pages → Deploy from branch `gh-pages` / root — or
+      `gh api -X POST repos/mreidhorrigan/Clod-Bathos-Superior-Machine-An-LM-IDN/pages -f 'source[branch]=gh-pages' -f 'source[path]=/'`.
+      URL: `https://mreidhorrigan.github.io/Clod-Bathos-Superior-Machine-An-LM-IDN/`
+      (already linked from matthorrigan.com → Games). An Actions auto-deploy workflow
+      waits at `tools/pages.workflow.yml` — moving it into `.github/workflows/` needs
+      `gh auth refresh -s workflow` (the current token lacks the workflow scope).
+- [ ] **Test the deployed flow** end-to-end in Chrome (fresh profile = real first-load UX).
 - [ ] (optional) `build.py --single` for the one-file Ollama/offline artifact.
 - [ ] (optional) Electron/Tauri wrapper for a desktop double-click.
 - [x] (done 2026-06-10) Folded the simplification into `stories/clod-bathos.story.js`; archived the
       complex Clod + SIGNAL under `stories/archive/`.
 
 ## Map / pointers
-- **git** — `main`; `b66998d` complex baseline, `8c11ae7` simplified (HEAD). Recover complex:
-  `git checkout b66998d -- story.js engine/engine.js`.
+- **git** — `main`; `a30477f` complex baseline, `ac738dc` simplified. Recover complex:
+  `git checkout a30477f -- story.js engine/engine.js`.
 - `CLAUDE.md` — orientation, architecture, conventions, no-Node testing trick.
 - `README.md` — full story schema, voice, presentation, builds, troubleshooting.
 - `engine/` — `llm.js` (dispatcher) + `providers/` + `engine.js` (FSM + `HOSTILE_RE` hostility)

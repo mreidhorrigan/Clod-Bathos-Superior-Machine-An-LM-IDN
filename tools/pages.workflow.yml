@@ -1,0 +1,42 @@
+# Build dist/web (the WebLLM browser build) and deploy it to GitHub Pages.
+# Pages must be enabled once (repo Settings → Pages → Source: "GitHub Actions");
+# on a free plan that needs the repo to be PUBLIC. After that, every push to
+# main redeploys; "Run workflow" (workflow_dispatch) redeploys on demand.
+# The deployed game needs a WebGPU browser (Chrome/Edge) and streams its model
+# from the MLC/HuggingFace CDN on first load — no weights are hosted here.
+name: Deploy web build to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the web (WebLLM) variant
+        run: python3 build.py web
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
