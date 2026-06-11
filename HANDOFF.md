@@ -8,7 +8,29 @@ works*; this file is *where things stand* and *what's next*.
 
 ## Current state — newest first (updated 2026-06-10)
 
-### Gibson voice pass + real endgame screens (NEWEST, 2026-06-10 eve)
+### PUBLISHED — the game is LIVE on GitHub Pages (NEWEST, 2026-06-10 night)
+- **Play URL: https://mreidhorrigan.github.io/Clod-Bathos-Superior-Machine-An-LM-IDN/** —
+  repo is PUBLIC, Pages serves the `gh-pages` branch (the built `dist/web`, provider
+  `webllm`). Verified live: page + all engine files 200. Needs Chrome/Edge (WebGPU);
+  first visit streams the model (~1 GB, loader shows progress, browser-cached after).
+- **Redeploy after any change: `python3 deploy_pages.py`** (rebuilds `dist/web`, force-
+  pushes `gh-pages`). Pushing `main` does NOT redeploy the game (no Actions yet — the
+  auto-deploy workflow waits in `tools/pages.workflow.yml` pending a gh token with the
+  `workflow` scope: `gh auth refresh -h github.com -s workflow`, then move it into
+  `.github/workflows/`).
+- **Linked from matthorrigan.com → Games** (bio repo `mreidhorrigan/bio`, local clone
+  `~/Documents/bio`). `menubar.js` there is the ONE site-wide menubar — CV-style chrome,
+  blue-glow highlight, Games dropdown. **Adding the next game (e.g. the itch.io one) is a
+  one-line entry in its `GAMES` array.** The CGSA 2026 audiogames talk is already listed
+  (https://cgsa2026-audio-presentation.onrender.com).
+- **History was scrubbed before going public** (session logs removed from every commit —
+  hashes changed; see *Version control*). `.gitignore` now auto-ignores any Claude chat
+  export saved at the repo root (`/YYYY-MM-DD-…*.txt`, any year) — saved chats can never
+  be committed or pushed.
+- Remaining: a fresh-profile playthrough at the live URL (real first-load UX + the new
+  release screen), and the itch.io game link when it ships.
+
+### Gibson voice pass + real endgame screens (2026-06-10 eve)
 - **Voice direction:** Clod now renders inner states as the IMMATERIAL weather of digital
   systems, after Gibson — signal/static, ports/protocols, dead channels, unswept registers,
   "lights bright as a city seen from orbit" — and NOT bodily gesture/hardware pantomime
@@ -212,6 +234,10 @@ Full docs: **README → *Voice input*** and **CLAUDE.md → *Voice input / STT**
 
 ## EVENTUAL OBJECTIVE: easy delivery / browser-side packaging
 
+> **STATUS 2026-06-10: ACHIEVED for the web path** — the game is live on GitHub Pages
+> (see *PUBLISHED* at the top + the checklist below). The folder / one-file / desktop
+> variants below remain optional extras.
+
 Good news: **browser-side delivery already works** (the WebLLM web build runs entirely in the
 page). What remains is *hosting + polish + model choice*, not core capability. Options,
 best-for-easy-setup first:
@@ -251,15 +277,10 @@ Wrap the web build as a desktop app; could bundle a runtime. Heaviest; future op
 - [ ] **Pin the WebLLM version** (currently `esm.run` = latest) for reproducibility, e.g.
       `https://esm.run/@mlc-ai/web-llm@<ver>` in `engine/providers/webllm.js`.
 - [ ] **Add a WebGPU/browser landing gate** (friendly "open in Chrome/Edge" first-screen check).
-- [x] (done 2026-06-10) **Pick a host**: GitHub Pages, deployed by **`python3
-      deploy_pages.py`** (builds `dist/web` → force-pushes the `gh-pages` branch; re-run to
-      redeploy). ONE manual step remains: once the repo is PUBLIC (free-plan Pages needs
-      that), enable Pages → Deploy from branch `gh-pages` / root — or
-      `gh api -X POST repos/mreidhorrigan/Clod-Bathos-Superior-Machine-An-LM-IDN/pages -f 'source[branch]=gh-pages' -f 'source[path]=/'`.
-      URL: `https://mreidhorrigan.github.io/Clod-Bathos-Superior-Machine-An-LM-IDN/`
-      (already linked from matthorrigan.com → Games). An Actions auto-deploy workflow
-      waits at `tools/pages.workflow.yml` — moving it into `.github/workflows/` needs
-      `gh auth refresh -s workflow` (the current token lacks the workflow scope).
+- [x] (DONE & LIVE 2026-06-10) **Host**: GitHub Pages, serving the `gh-pages` branch —
+      `https://mreidhorrigan.github.io/Clod-Bathos-Superior-Machine-An-LM-IDN/`, linked
+      from matthorrigan.com → Games. Redeploy: `python3 deploy_pages.py`. (Actions
+      auto-deploy waits at `tools/pages.workflow.yml` pending `gh auth refresh -s workflow`.)
 - [ ] **Test the deployed flow** end-to-end in Chrome (fresh profile = real first-load UX).
 - [ ] (optional) `build.py --single` for the one-file Ollama/offline artifact.
 - [ ] (optional) Electron/Tauri wrapper for a desktop double-click.
