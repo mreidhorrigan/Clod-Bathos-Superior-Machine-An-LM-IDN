@@ -8,7 +8,55 @@ works*; this file is *where things stand* and *what's next*.
 
 ## Current state — newest first (updated 2026-06-10)
 
-### Version control (NEW)
+### Gibson voice pass + real endgame screens (NEWEST, 2026-06-10 eve)
+- **Voice direction:** Clod now renders inner states as the IMMATERIAL weather of digital
+  systems, after Gibson — signal/static, ports/protocols, dead channels, unswept registers,
+  "lights bright as a city seen from orbit" — and NOT bodily gesture/hardware pantomime
+  (no more inclining interfaces, waved hands, preening). Changed: `meta.style`, the host
+  `systemPrompt`, and EVERY beat/fallback in `story.js` (facts preserved; storytest suite
+  still 24×3 green). Threshold's dead-channel line is a deliberate Neuromancer nod.
+- **Endgame flow (no more "(type /reset)" anywhere):**
+  - `pass_end` is flagged **`release:true`** → after the final beat plays, the page
+    dissolves into a **bright release screen** (`#release` overlay: warm light, faint
+    green field; text from `meta.releaseTitle/releaseSub/releaseInvitation`). Any key →
+    fade out → `relaunch()`.
+  - `reject_end` keeps **`retry:true`** → auto re-shows the loader (existing behavior).
+  - **Both restarts keep the LLMs loaded** — `relaunch()` rebuilds only the engine; no
+    model re-init/re-download. `/reset` still works as a typed command mid-game.
+  - Browser-unverified: the release screen needs one manual `serve.py` + Chrome look
+    (logic + parse are checked; suite green).
+
+### Headless LLM-live testing harness + render guards (2026-06-10 PM)
+- **`storytest.py` + `tests/driver.js`**: scripted playtests of the REAL engine
+  (`llm.js`+`engine.js`+story, production code paths) under JavaScriptCore, LLM calls
+  bridged to local **Ollama** — browser/vis/audio fully out of the loop. Scenarios in
+  `tests/scenarios/`: happy path, hostile boot, **gate routing matrix** (probe mode),
+  no-model fallback. `--reps` = reliability stats; `--llm off`; `--model X` to compare
+  models; `--ollama-seed` reproduces a failing rep; failures print the model's raw
+  choice + rationale (`-v` = full prompts). **Suite: 24 checks × 3 reps GREEN on
+  `smollm2:1.7b`** (the Ollama mirror of the shipped WebLLM SmolLM2-1.7B).
+- **The harness immediately caught 4 real bugs — all fixed:**
+  1. **Token-cap truncation** (re-voice cut mid-sentence at `renderMaxTokens`) →
+     `_renderBeat` now trims to the last finished sentence.
+  2. **Key-fact drift** (a `pass_end` re-voice never mentioned the door opening) →
+     new node-level `mustConvey` word guard → authored beat on miss.
+  3. **Persona parroting** — SmolLM2 echoed the persona prompt's QUOTED negative
+     examples verbatim ("Clod Bathos draws itself up", "a wee thing like me"). The
+     host prompt was rewritten with UNQUOTABLE prohibitions, and new
+     `meta.renderMustNot` regexes deterministically discard persona-breaking
+     re-voices (authored beat instead). **Rule: never quote a forbidden phrase in a
+     weak model's prompt.**
+  4. **Speaker-label prefixes** ("Narrator's voice:") → stripped in `_renderBeat`.
+- **Model data (routing matrix, 12 probes × 3 reps):** `smollm2:1.7b` **36/36**;
+  `qwen2.5:0.5b` misroutes plain greetings to `offend` (rationale: "'greetings,
+  great machine' is hostile…") — the historical polite→affronted bug, reproduced on
+  demand and neutralised by the deterministic veto. SmolLM2-1.7B stays the default,
+  now with evidence.
+- `stories/clod-bathos.story.js` re-mirrored (byte-identical) after the prompt fix.
+- JSC fact corrected: promise microtasks DO drain at end of an osascript evaluation —
+  full async `takeTurn()` runs headless when the LLM provider is synchronous.
+
+### Version control
 The project is now a **git repo** (branch `main`, working tree clean). Two commits:
 
 | Commit | What |
@@ -76,11 +124,12 @@ threshold ──inoffensive──▶ parley ──inoffensive──▶ entreaty 
   `signal.story.js` (the original SIGNAL, stored for later). Also recoverable from git `b66998d`.
 
 ### Open decisions (for the next session)
-- **Qwen vs SmolLM2:** user floated "maybe we need the old Qwen back." Kept SmolLM2 because the
-  deterministic binary made model quality low-stakes. One-line revert if preferred.
-- **All of the above is browser-unverified** — the deterministic logic + graph are JSC-tested
-  (parse OK, 0 params/signals/rules/bindings, escape=3), but the actual loop/voice/STT need a
-  manual `serve.py` + Chrome run to confirm.
+- **Qwen vs SmolLM2: RESOLVED with data** (storytest routing matrix) — SmolLM2-1.7B routes
+  36/36; the old Qwen-0.5B misroutes plain greetings to hostile. SmolLM2 stays. Re-compare
+  anytime: `python3 storytest.py tests/scenarios/clod-gates-probes.json --model <m> --reps 5`.
+- **Engine + story behavior is now harness-verified end-to-end with a live LLM** (routing,
+  veto, fallbacks, render guards, persona). Still needing a manual `serve.py` + Chrome run:
+  voice/STT/visuals/pacing — the documented audio/WebGPU boundary.
 
 ---
 
@@ -168,9 +217,19 @@ best-for-easy-setup first:
 ### A. Hosted WebLLM static site — RECOMMENDED for "no install, click a link"
 Deploy `dist/web/` to any static host; the end user opens a URL in Chrome/Edge, the model
 downloads once, and they play — zero install.
-- **Steps:** `python3 build.py web` → push `dist/web/` to GitHub Pages / Netlify / itch.io.
-- **Caveats:** WebGPU browser required (add a clean "use Chrome/Edge" gate); first-load
-  download size (pick the model deliberately); show download progress (already on the loader).
+- **SIZE IS NOT A BLOCKER — no model weights ship with the build.** `dist/web/` is well
+  under 1 MB of HTML+JS. WebLLM weights (~1 GB for SmolLM2-1.7B q4) stream at first run
+  from the MLC/HuggingFace CDN straight into the player's browser cache; the Whisper STT
+  model likewise (HF CDN, on first mic use); Ollama models live on the player's machine.
+  None of it touches your host or its limits (GitHub Pages: 1 GB site / 100 MB-per-file
+  / ~100 GB-month — all irrelevant here). No special headers needed; Pages' https also
+  satisfies the mic's secure-context requirement.
+- **Steps:** `python3 build.py web` → push `dist/web/` to **GitHub Pages** (public repo,
+  Settings → Pages) and/or upload the zip to **itch.io as an HTML5 game** (game audience,
+  built-in beta feedback). On itch, VERIFY the mic works inside its iframe — if blocked,
+  host on Pages and link from the itch page.
+- **Caveats:** WebGPU browser required (add the "use Chrome/Edge" gate); first-load
+  ~1 GB download (loader already shows progress; cached after); player bandwidth.
 
 ### B. Folder + Ollama — for users who want a local model / offline
 Ship `dist/folder/`. End user installs Ollama + runs it. More setup, but no download-per-play
@@ -184,9 +243,9 @@ for the folder/Ollama path. **Not possible for WebLLM** (weights/CDN are externa
 Wrap the web build as a desktop app; could bundle a runtime. Heaviest; future option.
 
 ### Concrete next steps (a checklist to execute)
-- [ ] **Confirm the shipped model.** Default is now `SmolLM2-1.7B-Instruct-q4f16_1-MLC`. For
-      route-on-the-model stories, compare vs `Qwen2.5-1.5B`/`Llama-3.2-1B`/`Qwen2.5-3B` on
-      routing quality + download size; set in `CONFIG.webllm.model`.
+- [x] (done 2026-06-10) **Confirm the shipped model** — `SmolLM2-1.7B` 36/36 on the
+      storytest routing matrix vs `qwen2.5:0.5b` misrouting greetings; stays. Re-compare
+      candidates anytime via `storytest.py --model …` (Ollama mirrors of the WebLLM ids).
 - [ ] **Pin the WebLLM version** (currently `esm.run` = latest) for reproducibility, e.g.
       `https://esm.run/@mlc-ai/web-llm@<ver>` in `engine/providers/webllm.js`.
 - [ ] **Add a WebGPU/browser landing gate** (friendly "open in Chrome/Edge" first-screen check).

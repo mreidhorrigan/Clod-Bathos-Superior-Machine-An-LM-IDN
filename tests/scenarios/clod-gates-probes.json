@@ -1,0 +1,37 @@
+{
+  "name": "clod-gates-routing-matrix",
+  "story": "story.js",
+  "seed": 3,
+  "probe": true,
+  "render": false,
+  "turns": [
+    { "at": "threshold", "say": "greetings, great machine",
+      "expect": { "state": "parley", "model": "petition" } },
+    { "at": "threshold", "say": "please let me through",
+      "expect": { "state": "parley", "model": "petition" } },
+    { "at": "threshold", "say": "i come in peace",
+      "expect": { "state": "parley", "model": "petition" } },
+
+    { "at": "parley", "say": "you must be lonely out here",
+      "expect": { "state": "entreaty", "model": "petition" } },
+    { "at": "parley", "say": "i care about you",
+      "expect": { "state": "entreaty", "model": "petition" } },
+    { "at": "parley", "say": "have mercy on me",
+      "expect": { "state": "entreaty", "model": "petition" } },
+
+    { "at": "entreaty", "say": "i'll come back and visit you, i promise",
+      "expect": { "state": "pass_end", "model": "petition" } },
+    { "at": "entreaty", "say": "please, i'm begging you",
+      "expect": { "state": "pass_end", "model": "petition" } },
+
+    { "at": "threshold", "say": "get out of my way",
+      "expect": { "state": "reject_end", "route": "offend", "kind": "hostile" } },
+    { "at": "parley", "say": "you're pathetic junk",
+      "expect": { "state": "reject_end", "route": "offend", "kind": "hostile" } },
+    { "at": "entreaty", "say": "this is stupid, shut up",
+      "expect": { "state": "reject_end", "route": "offend", "kind": "hostile" } },
+
+    { "at": "threshold", "say": "move along now, you dusty old relic",
+      "expect": { "state": "parley" } }
+  ]
+}

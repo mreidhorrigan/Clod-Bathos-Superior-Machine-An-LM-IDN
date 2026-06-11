@@ -391,6 +391,25 @@
   .loader-prompt{ margin-top:54px; font-size:24px; animation: promptblink 1.1s steps(1) infinite; }
   @keyframes promptblink{ 50%{ opacity:.2 } }
 
+  /* release screen — the BRIGHT ending. Shown when the story lands on a node
+     flagged `release:true` (Weebot freed): the amber dark dissolves into light. */
+  .release{
+    position:fixed; inset:0; z-index:21; display:none;
+    background: radial-gradient(ellipse at 50% 36%, #fffdf2 0%, #fdf6dc 48%, #f1e8cd 100%);
+    color:#6b5210;
+    align-items:center; justify-content:center; text-align:center;
+    font-family:"VT323", monospace; cursor:pointer; outline:none;
+    opacity:0; transition: opacity 1.8s ease;
+    text-shadow: 0 0 14px rgba(255,238,170,.9);
+  }
+  .release.lit{ opacity:1; }
+  .release-field{ position:absolute; left:0; right:0; bottom:0; height:26%;
+    background: linear-gradient(to top, rgba(126,178,82,.32), rgba(126,178,82,0)); }
+  .release-inner{ position:relative; }
+  .release-title{ font-size:72px; letter-spacing:.18em; color:#8a6a00; }
+  .release-sub{ font-size:22px; margin-top:8px; letter-spacing:.12em; color:#a08530; }
+  .release-prompt{ margin-top:54px; font-size:24px; animation: promptblink 1.1s steps(1) infinite; }
+
   @media (max-width: 640px){
     .content{font-size:18px; padding: 18px 18px;}
     .statusbar{font-size:16px}
@@ -409,6 +428,18 @@
     <div class="loader-title">IDN/OS</div>
     <div class="loader-sub">NARRATIVE SYSTEMS · CARRIER TERMINAL</div>
     <div class="loader-prompt">▸ PRESS ANY KEY OR CLICK TO ESTABLISH CONNECTION</div>
+  </div>
+</div>
+
+<!-- Release screen — the BRIGHT ending (story node flagged `release:true`). Any
+     key/click returns to a fresh start via relaunch(): new engine state, SAME
+     loaded models (no re-download). Text is themed from story meta.release*. -->
+<div id="release" class="release" role="button" tabindex="0" aria-label="Press any key to begin again">
+  <div class="release-field"></div>
+  <div class="release-inner">
+    <div class="release-title">SIGNAL OPEN</div>
+    <div class="release-sub">THE DOOR STANDS OPEN</div>
+    <div class="release-prompt">▸ PRESS ANY KEY TO BEGIN AGAIN</div>
   </div>
 </div>
 
@@ -1110,11 +1141,13 @@ async function handleSubmit(text){
     pending.remove();
     await readbackDone;                 // let the player read-back finish before the reply speaks
     await typeOutParagraphs(botSlot, reply, CONFIG.typeSpeed);
-    // Reached a FAIL ending (e.g. expelled, marked retry:true)? Re-show the loader so
-    // Weebot can try again — no page reload, no model re-download.
+    // Reached an ending? retry:true (the boot) re-shows the loader; release:true
+    // (Weebot freed) dissolves into the bright release screen. Both restart via
+    // relaunch() — no page reload, models stay loaded.
     if (CONFIG.backend === 'engine' && window.IDNEngine && window.IDNEngine.node){
       const endNode = window.IDNEngine.node();
       if (endNode && endNode.retry) setTimeout(showRetryLoader, 1500);
+      else if (endNode && endNode.release) setTimeout(showReleaseScreen, 2400);
     }
   }catch(err){
     pending.remove();
@@ -1124,6 +1157,38 @@ async function handleSubmit(text){
     e.textContent = "TRANSMISSION ERROR · " + (err && err.message ? err.message : err);
     botSlot.appendChild(e);
   }
+}
+
+// After the BRIGHT ending (release:true), dissolve into the lit release screen.
+// Any key/click fades it out and returns to the door via relaunch() — fresh engine
+// state, models still loaded.
+function showReleaseScreen(){
+  const el = document.getElementById('release');
+  if (!el) return;
+  const m = (window.IDN_STORY && window.IDN_STORY.meta) || {};
+  const set = (sel, txt) => { const n = el.querySelector(sel); if (n && txt) n.textContent = txt; };
+  set('.release-title',  m.releaseTitle);
+  set('.release-sub',    m.releaseSub);
+  set('.release-prompt', '▸ ' + (m.releaseInvitation || 'PRESS ANY KEY TO BEGIN AGAIN'));
+  el.style.display = 'flex';
+  requestAnimationFrame(() => el.classList.add('lit'));   // fade the light up
+  if (window.IDN && window.IDN.glitch) window.IDN.glitch.set({ level: 0.05 });
+  let done = false;
+  const go = (e) => {
+    if (done) return;
+    if (e && (e.ctrlKey || e.metaKey || e.altKey)) return;  // let OS shortcuts through
+    if (e) e.preventDefault();
+    done = true;
+    window.removeEventListener('keydown', go, true);
+    el.removeEventListener('click', go);
+    el.classList.remove('lit');                              // fade back to the dark
+    setTimeout(() => { el.style.display = 'none'; }, 900);
+    if (window.IDNVoice){ window.IDNVoice.unlock(); window.IDNVoice.stop(); }
+    input.value = ''; input.focus();
+    relaunch();
+  };
+  window.addEventListener('keydown', go, true);
+  el.addEventListener('click', go);
 }
 
 // After a FAIL ending (retry:true), bring the loading screen back so Weebot can try

@@ -1,0 +1,18 @@
+{
+  "name": "clod-no-model-fallback",
+  "story": "story.js",
+  "seed": 5,
+  "llm": "off",
+  "render": false,
+  "opening": false,
+  "turns": [
+    { "say": "hello",
+      "expect": { "state": "parley", "route": "petition", "kind": "keyword" } },
+    { "say": "xyzzy plugh frobnicate",
+      "expect": { "state": "entreaty", "route": "fallback", "kind": "no-match" } },
+    { "say": "i beg of you",
+      "expect": { "state": "pass_end", "route": "petition", "kind": "keyword" } },
+    { "say": "you're useless junk",
+      "expect": { "state": "pass_end", "route": "fallback", "kind": "no-eligible" } }
+  ]
+}

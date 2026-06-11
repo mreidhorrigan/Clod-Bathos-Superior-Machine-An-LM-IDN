@@ -178,6 +178,42 @@ python3 build.py web      # just the WebLLM / http build
 
 Both share the exact same `engine/`, `story.js`, etc.; each build folder gets a `READ-ME-FIRST.txt` quick-start.
 
+## Headless story testing (`storytest.py`)
+
+Iterate on routing + prose with the model LIVE and **no browser, no vis/audio in the
+loop**. `storytest.py` runs the REAL engine (`engine/llm.js` + `engine/engine.js` + a
+story file) under macOS JavaScriptCore (`tests/driver.js`) and bridges its LLM calls to
+local **Ollama** — same prompts, same JSON schema, same veto/fallback paths as the page.
+
+```sh
+python3 storytest.py                            # run every tests/scenarios/*.json
+python3 storytest.py tests/scenarios/clod-happy.json --reps 5
+python3 storytest.py --llm off                  # no model: keyword/fallback path only
+python3 storytest.py --model qwen2.5:1.5b-instruct --reps 10   # compare models
+python3 storytest.py --transcript out.md -v     # prose review / full prompt dumps
+```
+
+- **Scenarios** (`tests/scenarios/*.json`) script player turns with per-turn
+  expectations: `state` / `route` (transition taken) / `kind`
+  (`llm|llm-none|keyword|no-match|hostile|no-eligible`) / `model` (the RAW transition
+  the model chose, even when the engine vetoed it) / `must`/`mustNot` regexes on the
+  reply — plus scenario-wide `persona` regexes (applied to every reply incl. the
+  opening). `probe: true` runs each turn on a fresh engine at its `at:` node — a
+  routing matrix for exactly the phrasings that historically misrouted. Full schema:
+  the `storytest.py` docstring.
+- `--reps N` repeats for reliability stats (`model: petition×4 offend×1`);
+  `--ollama-seed` makes a failing rep exactly reproducible; failures print the model's
+  raw appraisal + rationale, and `-v` dumps the full prompts it saw.
+- **Model parity:** WebLLM and Ollama run the same weights under different
+  quantization/runtimes — close, not bit-identical (SmolLM2-1.7B ↔ `smollm2:1.7b`,
+  Qwen2.5-1.5B ↔ `qwen2.5:1.5b-instruct`, Llama-3.2-1B ↔ `llama3.2:1b`). Failures
+  found here are almost always real story/prompt weaknesses; confirm WebLLM-specific
+  quirks with a manual browser run.
+- Prose findings feed the **render guards** (below): node `mustConvey`,
+  `meta.renderMustNot`, automatic speaker-label stripping, and mid-sentence
+  truncation trimming in `_renderBeat` — each discards a bad re-voice in favour of
+  the authored beat (always safe: same content).
+
 ## Story-graph schema (`story.js`)
 
 ```js
@@ -187,6 +223,10 @@ window.IDN_STORY = {
     start: "node_id",            // entry node
     defaultSpeaker: "host",      // used if a node omits `speaker`
     style: "…",                  // appended to EVERY render (tone/setting rules)
+    renderMustNot: ["\\bi am an abacus"], // PERSONA BACKSTOP: a re-voice matching any
+                                 // regex (case-insens.) is discarded → authored beat.
+                                 // (Don't QUOTE forbidden phrases in systemPrompt —
+                                 // weak models parrot them; forbid them here instead.)
   },
 
   // World vars. A plain value is exposed to the LLM and not appraised; or use a
@@ -253,6 +293,8 @@ window.IDN_STORY = {
       beat: "Authored facts/prose for this moment.",
       signal: "tone",             // optional: also classify this signal this turn
       improv: false,              // optional: loosen re-voicing into bounded freeform
+      mustConvey: ["door","open"],// optional KEY-FACT guard: a re-voice containing NONE
+                                  // of these words is discarded → authored beat shown
       present: "dread",           // optional: a named presentation profile (see Presentation)
       onEnter: {                  // applied when the node is entered (overrides `present`)
         set: { "world.flag": true }, inc: { "world.trust": 1 },

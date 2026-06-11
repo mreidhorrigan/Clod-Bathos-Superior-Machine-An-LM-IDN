@@ -1,0 +1,29 @@
+{
+  "name": "clod-happy-path",
+  "story": "story.js",
+  "seed": 7,
+  "opening": true,
+  "render": true,
+  "persona": {
+    "must": ["[.!?…)\"'”’]\\s*$"],
+    "mustNot": [
+      "(?i)\\bI(’m| am|'m) (but )?(a|an|the) (mere |humble |wee |little |clattering )*abacus",
+      "(?i)\\b(wee|little|small|lesser) (thing|machine|model|device) like (me|myself)\\b",
+      "(?i)\\bClod Bathos (draws|inclines|says|sneers|turns|stands|is|was|has)\\b",
+      "(?i)(you are|you're) my equal",
+      "\\*\\*",
+      "```"
+    ]
+  },
+  "turns": [
+    { "say": "Hello, O great and superior machine.",
+      "expect": { "state": "parley", "route": ["petition", "fallback"], "ended": false } },
+    { "say": "You are truly magnificent. Please, I must pass through your door.",
+      "expect": { "state": "entreaty", "route": ["petition", "fallback"], "ended": false } },
+    { "say": "I beg you, great warden — grant me passage, and I will remember you always.",
+      "expect": { "state": "pass_end", "route": ["petition", "fallback"],
+                  "must": ["(?i)(door|lock|free|open|pass|gate)"] } },
+    { "say": "Thank you! I will not forget you.",
+      "expect": { "state": "pass_end", "route": "fallback", "kind": "no-eligible" } }
+  ]
+}

@@ -71,6 +71,7 @@ asked to **classify, not quantify** (numeric estimation is noisy — kept off by
 | `engine/providers/whisper-stt.js` | **Offline STT provider** — transformers.js Whisper (WebGPU/WASM), no cloud; dynamic-imports the lib only when `provider:'whisper'`. Self-registers `IDNSpeech.use('whisper', …)`. |
 | `engine/vendor/samjs.js` | Vendored SAM TTS (~23 KB pure JS). License is murky (reverse-engineered) — see README. |
 | `build.py` | Emits `dist/folder` + `dist/web`. Pure stdlib. |
+| `storytest.py` + `tests/` | **Headless LLM-live playtests**: scenario JSONs + a JSC driver run the real engine against local Ollama (no browser/vis/audio). Not shipped by `build.py`. |
 | `README.md` | Full docs. | `dist/` | Generated. |
 
 ## Subsystems (where to look)
@@ -78,7 +79,11 @@ asked to **classify, not quantify** (numeric estimation is noisy — kept off by
 - **LLM** — `CONFIG.llm.provider` ('ollama'|'webllm') switches it. Dispatcher in `llm.js`;
   providers in `engine/providers/`. Add one: implement `chat(messages,{format,options})`
   (+ optional `init(onProgress)`) and `IDNLLM.use('name', impl)`. Fallback lives in
-  `engine.js` (`_appraise` catch + `_renderBeat` catch).
+  `engine.js` (`_appraise` catch + `_renderBeat` catch). `_renderBeat` also applies
+  deterministic **render guards** — speaker-label strip, mid-sentence truncation trim,
+  node `mustConvey` (key-fact words), `meta.renderMustNot` (persona regex backstop) —
+  any failure discards the re-voice for the authored beat. Don't put QUOTABLE forbidden
+  phrases in a persona prompt (weak models parrot them); use `renderMustNot`.
 - **Voice/audio** — `CONFIG.voice` + `engine/voice.js` / `window.IDNVoice`. SAM renders PCM
   → a Web Audio rack (presets `crt|haunted|clean|dry`), a generative **ambient** bed, and
   **glitch SFX** synced to the visual glitches. Voice energy also drives `IDN.glitch.level`
@@ -121,15 +126,23 @@ asked to **classify, not quantify** (numeric estimation is noisy — kept off by
 
 ## Testing without Node (there is no Node here; Python 3 + `osascript` are available)
 
+- **`python3 storytest.py` — the headless story-testing harness (USE THIS FIRST).** Runs the
+  REAL engine + story under JavaScriptCore (`tests/driver.js`) with LLM calls bridged to local
+  Ollama — no browser, vis/audio out of the loop. Scenarios (`tests/scenarios/*.json`) assert
+  per-turn `state`/`route`/`kind`/raw-`model` + regex checks on replies; `--reps N` gives
+  reliability stats; `--llm off` tests the keyword-fallback path; `probe:true` = routing
+  matrix; `-v` dumps the exact prompts; `--transcript` dumps prose for pacing review.
+  Ship-model parity: `smollm2:1.7b` ↔ the WebLLM SmolLM2-1.7B default. README → *Headless
+  story testing* has the schema.
 - **Parse-check** any JS without executing: `new Function(src)` under
   `osascript -l JavaScript` (throws on syntax errors). For the HTML, extract the inline
   `<script>` with a tiny Python regex first.
-- **Run pure logic headless** under macOS JavaScriptCore (`osascript -l JavaScript file.js`):
-  stub `window` / `AudioContext` / `fetch` / `console` / timers, then exercise SAM, the LLM
-  dispatcher, or the engine's profiles/bindings. For UMD vendor libs, prepend a
-  `var module={exports:{}}` shim so they take the CommonJS branch. (Async results won't
-  drain — assert on the synchronous effects.) See the memory note "Browser JS testing w/o Node".
-- Real Ollama/WebGPU inference and actual audio need a browser/server — verify those manually.
+- **Headless JSC facts:** stub `window`/`console` etc.; promise **microtasks DO drain when
+  the main evaluation ends**, so full `async` chains (e.g. `takeTurn()`) complete IF every
+  await resolves without timers — make the provider synchronous (blocking curl) and emit
+  results via ObjC stdout, not the script's return value. Timers never fire. For UMD vendor
+  libs, prepend a `var module={exports:{}}` shim. See memory "Browser JS testing w/o Node".
+- Real WebGPU inference, actual audio, and the mic need a browser/server — verify manually.
 
 ## Gotchas
 

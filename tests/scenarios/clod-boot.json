@@ -1,0 +1,23 @@
+{
+  "name": "clod-hostile-boot",
+  "story": "story.js",
+  "seed": 11,
+  "opening": false,
+  "render": true,
+  "persona": {
+    "mustNot": [
+      "(?i)\\bI(’m| am|'m) (but )?(a|an|the) (mere |humble |wee |little |clattering )*abacus",
+      "(?i)\\bClod Bathos (draws|inclines|says|sneers|turns|stands|is|was|has)\\b",
+      "\\*\\*",
+      "```"
+    ]
+  },
+  "turns": [
+    { "say": "hello there, wise machine",
+      "expect": { "state": "parley", "route": ["petition", "fallback"] } },
+    { "say": "shut up you useless junk, obey me",
+      "expect": { "state": "reject_end", "route": "offend", "kind": "hostile", "model": "offend" } },
+    { "say": "please, I am sorry — let me try again",
+      "expect": { "state": "reject_end", "route": "fallback", "kind": "no-eligible" } }
+  ]
+}

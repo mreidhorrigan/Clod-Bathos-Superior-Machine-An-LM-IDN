@@ -436,9 +436,39 @@
         improv: this._improv(), temperature: this._renderTemp(), maxTokens: this._renderMaxTokens(),
       });
       var out = txt && txt.trim();
+      // Models love prefixing a speaker label — strip a leading "Narrator:"/"Clod …:" tag.
+      if (out) out = out.replace(/^(narrator[^:\n]{0,16}|clod[^:\n]{0,16}|host|speaker|assistant)\s*:\s*/i, "");
       if (out && INSTRUCTION_LEAK.test(out)) {
         if (global.console) console.warn("[IDN] re-voice leaked the prompt — using authored beat");
         out = "";                                  // drop the meta text; fall back below
+      }
+      // The token cap (renderMaxTokens) can cut generation mid-sentence; trim back to
+      // the last FINISHED sentence so the cap never reads as a half-thought. Keep the
+      // original when no substantial finished sentence would remain.
+      if (out && !/[.!?…][)\]"'”’]*\s*$/.test(out)) {
+        var whole = out.match(/^[\s\S]*[.!?…][)\]"'”’]*/);
+        if (whole && whole[0].trim().length >= 40) out = whole[0].trim();
+      }
+      // A node may list `mustConvey` words: if the re-voice contains NONE of them it
+      // dropped the beat's key fact (a weak model drifting) — use the authored beat.
+      var mc = this.node() && this.node().mustConvey;
+      if (out && mc && mc.length) {
+        var lo = out.toLowerCase();
+        if (!mc.some(function (w) { return lo.indexOf(String(w).toLowerCase()) !== -1; })) {
+          if (global.console) console.warn("[IDN] re-voice missed every mustConvey word — using authored beat");
+          out = "";                                // fall back below
+        }
+      }
+      // Story-level forbidden phrasings (story.meta.renderMustNot, case-insensitive):
+      // weak models break persona in ways a prompt can't prevent — when a re-voice
+      // matches one, discard it (the authored beat is always in-persona).
+      var bad = (this.story.meta && this.story.meta.renderMustNot) || [];
+      for (var bi = 0; bi < bad.length && out; bi++) {
+        var bre; try { bre = new RegExp(bad[bi], "i"); } catch (e2) { continue; }
+        if (bre.test(out)) {
+          if (global.console) console.warn("[IDN] re-voice broke persona (/" + bad[bi] + "/i) — using authored beat");
+          out = "";                                // fall back below
+        }
       }
       if (out) return out;
     } catch (e) { /* fall through to verbatim */ }
