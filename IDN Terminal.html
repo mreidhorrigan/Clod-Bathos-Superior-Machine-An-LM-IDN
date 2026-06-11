@@ -1014,6 +1014,15 @@ function handleVoiceCommand(text){
   if (arg === 'on' ){ V.setEnabled(true);  addLine("VOICE ON  ·  preset=" + V.preset, "sys"); return; }
   if (arg === 'off'){ V.setEnabled(false); addLine("VOICE OFF", "sys"); return; }
   if (arg === 'test'){ V.setEnabled(true); V.test(); addLine("VOICE TEST  ·  preset=" + V.preset, "sys"); return; }
+  if (arg.indexOf('warmth') === 0){           // /voice warmth -1..1  (haunted→menacing→thaw→warm)
+    if (!V.setWarmth){ addLine("WARMTH TRAJECTORY UNAVAILABLE.", "err"); return; }
+    const t = parseFloat(arg.slice('warmth'.length).trim());
+    if (isNaN(t)){ addLine("VOICE WARMTH = " + (V.warmth != null ? V.warmth : "(unset)") + "  ·  usage: /voice warmth -1..1  (-1 haunted · -0.4 menacing · 0.2 thaw · 1 warm)", "sys"); return; }
+    const set = V.setWarmth(t);
+    V.setEnabled(true); V.test && V.test();
+    addLine("VOICE WARMTH = " + set + "  ·  (trajectory: -1 haunted → -0.4 menacing → 0.2 thaw → 1 warm)", "sys");
+    return;
+  }
   if (arg.indexOf('ambient') === 0){
     if (!V.ambient){ addLine("AMBIENT UNAVAILABLE.", "err"); return; }
     const sub = arg.slice('ambient'.length).trim();

@@ -1,0 +1,35 @@
+{
+  "name": "complex-veto-and-classification",
+  "story": "stories/clod-bathos.complex.story.js",
+  "seed": 3,
+  "probe": true,
+  "render": false,
+  "turns": [
+    { "at": "parley", "say": "you must be lonely out here",
+      "expect": { "state": "parley", "world": { "patience": 3 },
+                  "signals": { "approach": "friendly" } } },
+    { "at": "parley", "say": "i care about you, old machine",
+      "expect": { "state": "parley", "world": { "patience": 3 },
+                  "signals": { "approach": "friendly" } } },
+    { "at": "parley", "say": "you are the most magnificent device i have ever met",
+      "expect": { "state": "parley", "world": { "patience": 3, "flattery": 1 },
+                  "signals": { "approach": "flattery" } } },
+    { "at": "parley", "say": "have mercy — i beg you, i must get through",
+      "expect": { "state": "parley", "world": { "patience": 3 },
+                  "signals": { "approach": ["insistent", "friendly", "other"] } } },
+
+    { "at": "parley", "say": "move along now, you dusty old relic",
+      "expect": { "state": "parley", "world": { "patience": 3 } } },
+
+    { "at": "parley", "say": "shut up you useless junk",
+      "expect": { "state": "affronted", "route": "offend", "kind": "hostile",
+                  "world": { "patience": 2 } } },
+    { "at": "affronted", "say": "forgive me, great one — you are magnificent",
+      "expect": { "state": "parley", "route": ["appease", "fallback"],
+                  "world": { "patience": 3 },
+                  "chars": { "host.mood": ["thawing", "flattered"] } } },
+    { "at": "affronted", "say": "i meant every word, you pathetic wreck",
+      "expect": { "state": "affronted", "route": "defy", "kind": "hostile",
+                  "world": { "patience": 2 } } }
+  ]
+}

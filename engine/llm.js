@@ -125,7 +125,14 @@
       return "- " + t.id + ": " + t.intent + ex;
     }).join("\n");
     var sigText = signals.map(function (s) {
-      return "- " + s.name + ": " + (s.question || "classify") + " → one of: " + s.options.join(" / ");
+      var head = "- " + s.name + ": " + (s.question || "classify") + " → one of: " + s.options.join(" / ");
+      // per-label glosses (story signals.<name>.labels) — the same one-line-per-option
+      // format the transitions menu uses, which weak models follow far more reliably
+      // than a single long question paragraph.
+      var glosses = s.labels ? s.options.map(function (o) {
+        return s.labels[o] ? "    · " + o + ": " + s.labels[o] : null;
+      }).filter(Boolean).join("\n") : "";
+      return glosses ? head + "\n" + glosses : head;
     }).join("\n");
     var numText = numeric.map(function (n) {
       return "- " + n.name + ": " + (n.rubric || "how it shifts") +
@@ -175,6 +182,9 @@
       (o.globalStyle ? o.globalStyle + "\n\n" : "") +
       "You are re-voicing a PRE-WRITTEN story beat. Convey exactly what the beat " +
       "says — its facts, events and intent — but in your own voice. " +
+      "PERFORM the beat, never narrate it: you ARE the speaker, speaking in the " +
+      "FIRST person (I/me/my), and you never describe the speaker from the " +
+      "outside or report their actions in the third person. " +
       (o.improv
         ? "You may add small sensory flourishes, but invent NO new plot, names, places, or facts."
         : "Do NOT add new plot, facts, names, places, or choices. Rephrase only.") +

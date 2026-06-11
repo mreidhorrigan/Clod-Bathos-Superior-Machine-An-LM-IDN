@@ -46,6 +46,9 @@ SCENARIO FILE (tests/scenarios/*.json):
         "kind": "llm",              //   llm|llm-none|keyword|no-match|hostile|no-eligible
         "model": "petition",        //   the RAW transition the model chose (routing accuracy,
                                     //   even when the engine vetoed/overrode it)
+        "world": {"patience": 2},   //   world params AFTER the turn (subset match)
+        "signals": {"approach": ["flattery","friendly"]},  // RAW signal classification
+        "chars": {"host.mood": "thawing"},  //   character state after the turn
         "ended": false,
         "must": ["(?i)door"],       //   regexes the reply must match
         "mustNot": []               //   ... and must not
@@ -161,6 +164,15 @@ def check_turn(exp, persona, ev, live):
         fails.append(f"ended: expected {exp['ended']}, got {ev.get('ended')}")
     raw = (ev.get("appraisal") or {}).get("transition")
     _want(fails, "model", exp.get("model"), raw)
+    for key, want in (exp.get("world") or {}).items():            # world params after the turn
+        _want(fails, f"world.{key}", want, (ev.get("world") or {}).get(key))
+    for name, want in (exp.get("signals") or {}).items():         # the RAW signal the model chose
+        _want(fails, f"signal.{name}", want,
+              ((ev.get("appraisal") or {}).get("signals") or {}).get(name))
+    for path, want in (exp.get("chars") or {}).items():           # "host.mood": "thawing"
+        cid, _, field = path.partition(".")
+        got = (((ev.get("chars") or {}).get(cid) or {}).get("state") or {}).get(field)
+        _want(fails, f"char.{path}", want, got)
     _regexes(fails, "reply", exp.get("must"), ev.get("reply"), negate=False)
     _regexes(fails, "reply", exp.get("mustNot"), ev.get("reply"), negate=True)
     _regexes(fails, "persona", (persona or {}).get("must"), ev.get("reply"), negate=False)

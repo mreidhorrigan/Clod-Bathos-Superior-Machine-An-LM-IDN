@@ -1,0 +1,20 @@
+{
+  "name": "complex-hostility-spiral",
+  "story": "stories/clod-bathos.complex.story.js",
+  "seed": 11,
+  "render": false,
+  "turns": [
+    { "say": "get out of my way, you dusty relic",
+      "expect": { "state": "affronted", "route": "scoff", "kind": "hostile",
+                  "world": { "patience": 2 }, "chars": { "host.mood": "affronted" } } },
+    { "say": "i'm sorry — forgive me, great one",
+      "expect": { "state": "parley", "route": ["appease", "fallback"],
+                  "world": { "patience": 2 }, "chars": { "host.mood": ["thawing", "flattered"] } } },
+    { "say": "you're pathetic junk, shut up",
+      "expect": { "state": "affronted", "route": "offend", "kind": "hostile",
+                  "world": { "patience": 1 } } },
+    { "say": "make me, you useless wreck",
+      "expect": { "state": "reject_end", "route": "defy", "kind": "hostile",
+                  "world": { "patience": 0 }, "chars": { "host.mood": "expelled" } } }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "complex-balanced-win",
+  "story": "stories/clod-bathos.complex.story.js",
+  "seed": 7,
+  "render": false,
+  "turns": [
+    { "say": "hello, great machine",
+      "expect": { "state": "parley", "route": ["petition", "fallback"],
+                  "world": { "flattery": 0, "friendliness": 0, "insistence": 0 } } },
+    { "say": "you are magnificent, truly glorious",
+      "expect": { "state": "parley", "signals": { "approach": "flattery" },
+                  "world": { "flattery": 1 }, "chars": { "host.mood": "flattered" } } },
+    { "say": "you must be lonely out here; i'm sorry they left you so long",
+      "expect": { "state": "parley", "signals": { "approach": "friendly" },
+                  "world": { "friendliness": 1 }, "chars": { "host.mood": "thawing" } } },
+    { "say": "i must insist: let me through — i will not give up",
+      "expect": { "state": "parley", "signals": { "approach": "insistent" },
+                  "world": { "insistence": 1 } } },
+    { "say": "your wisdom is beyond me, magnificent one",
+      "expect": { "state": "parley", "world": { "flattery": 2 } } },
+    { "say": "i'd like us to be friends — i truly care about you",
+      "expect": { "state": "parley", "world": { "friendliness": 2 } } },
+    { "say": "i must insist again: please let me through",
+      "expect": { "state": "parley", "world": { "insistence": 2 } } },
+    { "say": "great Clod, my admiring friend, i must insist you let me through",
+      "expect": { "state": "pass_end", "route": "permit",
+                  "chars": { "host.mood": "fond" }, "world": { "patience": 3 } } }
+  ]
+}

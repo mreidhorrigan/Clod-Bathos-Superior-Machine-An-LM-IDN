@@ -1,0 +1,22 @@
+{
+  "name": "complex-overload-timeout",
+  "story": "stories/clod-bathos.complex.story.js",
+  "seed": 5,
+  "llm": "off",
+  "render": false,
+  "turns": [
+    { "say": "zzz qwx blorp", "expect": { "state": "parley", "kind": "no-match" } },
+    { "say": "zzz qwx blorp" },
+    { "say": "zzz qwx blorp" },
+    { "say": "zzz qwx blorp" },
+    { "say": "zzz qwx blorp" },
+    { "say": "zzz qwx blorp" },
+    { "say": "zzz qwx blorp" },
+    { "say": "zzz qwx blorp" },
+    { "say": "zzz qwx blorp" },
+    { "say": "zzz qwx blorp" },
+    { "say": "zzz qwx blorp", "expect": { "state": "parley" } },
+    { "say": "zzz qwx blorp",
+      "expect": { "state": "overload_end", "chars": { "host.mood": "shattered" } } }
+  ]
+}

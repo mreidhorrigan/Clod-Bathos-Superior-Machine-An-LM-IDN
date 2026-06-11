@@ -85,7 +85,11 @@ asked to **classify, not quantify** (numeric estimation is noisy — kept off by
   any failure discards the re-voice for the authored beat. Don't put QUOTABLE forbidden
   phrases in a persona prompt (weak models parrot them); use `renderMustNot`.
 - **Voice/audio** — `CONFIG.voice` + `engine/voice.js` / `window.IDNVoice`. SAM renders PCM
-  → a Web Audio rack (presets `crt|haunted|clean|dry`), a generative **ambient** bed, and
+  → a Web Audio rack (presets `crt|menacing|haunted|thaw|warm|clean|dry`, plus the **WARMTH
+  TRAJECTORY**: `setWarmth(t)`, t ∈ -1 haunted … -0.4 menacing … +0.2 thaw … +1 warm,
+  interpolates the rack between anchors; drive via profile `warmth:` or a `voice.warmth`
+  binding — the simple Clod's gates climb it; the complex Clod binds mood to it), a
+  generative **ambient** bed, and
   **glitch SFX** synced to the visual glitches. Voice energy also drives `IDN.glitch.level`
   (reactive). Spoken text is **paced to the audio duration**; `CONFIG.typeSpeed` is the
   unvoiced fallback (~13 cps = SAM's rate). `/voice …` slash commands toggle/tune it live.
@@ -128,12 +132,12 @@ asked to **classify, not quantify** (numeric estimation is noisy — kept off by
 
 - **`python3 storytest.py` — the headless story-testing harness (USE THIS FIRST).** Runs the
   REAL engine + story under JavaScriptCore (`tests/driver.js`) with LLM calls bridged to local
-  Ollama — no browser, vis/audio out of the loop. Scenarios (`tests/scenarios/*.json`) assert
-  per-turn `state`/`route`/`kind`/raw-`model` + regex checks on replies; `--reps N` gives
-  reliability stats; `--llm off` tests the keyword-fallback path; `probe:true` = routing
-  matrix; `-v` dumps the exact prompts; `--transcript` dumps prose for pacing review.
-  Ship-model parity: `smollm2:1.7b` ↔ the WebLLM SmolLM2-1.7B default. README → *Headless
-  story testing* has the schema.
+  Ollama — no browser, vis/audio out of the loop. **Operating manual: `tests/README.md`**
+  (suites, commands, output interpretation, the debugging loop). Two suites: the DEFAULT
+  (`storytest.py --reps 3`, simple story, must stay green on `smollm2:1.7b`) and the COMPLEX
+  (`storytest.py tests/scenarios/complex/*.json --model llama3.2 --reps 3` — that story's
+  5-way signal taxonomy is noise below ~3B, measured). `--llm off` = keyword-fallback path;
+  `probe:true` = routing matrix; `-v` dumps the exact prompts.
 - **Parse-check** any JS without executing: `new Function(src)` under
   `osascript -l JavaScript` (throws on syntax errors). For the HTML, extract the inline
   `<script>` with a tiny Python regex first.

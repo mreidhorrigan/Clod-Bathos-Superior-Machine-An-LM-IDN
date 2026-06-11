@@ -102,16 +102,18 @@ window.IDN_STORY = {
   /* No signals — hostility is judged deterministically in the engine. */
   signals: {},
 
-  /* PRESENTATION: a look + VOICE per node. The `preset` sets the speaking voice
-   * directly (no reactive bindings — there are no parameters to bind). Glitch
-   * climbs gate-by-gate so the machine visibly frays as the petition wears on. */
+  /* PRESENTATION: a look + VOICE per node. The voice rides the WARMTH TRAJECTORY
+   * (engine/voice.js: -1 haunted → -0.4 menacing → +0.2 thaw → +1 warm): each gate
+   * is a stop along it — Clod starts somewhat menacing and audibly THAWS as the
+   * petition lands, going fully warm at release and spectral-cold on the boot.
+   * Glitch still climbs gate-by-gate (the machine frays as the warmth grows). */
   presentation: {
     profiles: {
-      gate1:     { glitch: 0.35, preset: "menacing", clock: { date: "MM-DDD-YY", time: "--:--:--" } },
-      gate2:     { glitch: 0.45, preset: "menacing" },
-      gate3:     { glitch: 0.60, preset: "menacing" },
-      permitted: { glitch: 0.12, preset: "clean",   burst: { level: 1.4, duration: 1500 }, clock: {} },
-      expelled:  { glitch: 0.85, preset: "haunted",  burst: { level: 1.4, duration: 1000 }, sfx: 0.45,
+      gate1:     { glitch: 0.35, warmth: -0.5,  clock: { date: "MM-DDD-YY", time: "--:--:--" } },
+      gate2:     { glitch: 0.45, warmth: -0.25 },
+      gate3:     { glitch: 0.60, warmth: 0.25 },   // "something in me STIRS" — first thaw
+      permitted: { glitch: 0.12, warmth: 1,     burst: { level: 1.4, duration: 1500 }, clock: {} },
+      expelled:  { glitch: 0.85, warmth: -1,    burst: { level: 1.4, duration: 1000 }, sfx: 0.45,
                    clock: { date: "ER-ROR-RR", time: "--:--:--" } },
     },
   },

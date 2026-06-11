@@ -6,9 +6,39 @@ works*; this file is *where things stand* and *what's next*.
 
 ---
 
-## Current state — newest first (updated 2026-06-10)
+## Current state — newest first (updated 2026-06-11)
 
-### PUBLISHED — the game is LIVE on GitHub Pages (NEWEST, 2026-06-10 night)
+### Voice warmth trajectory + complex story tested & promoted (NEWEST, 2026-06-11)
+- **VOICE TRAJECTORY** (`engine/voice.js`): one warmth axis through the presets —
+  **-1 haunted · -0.4 menacing · +0.2 thaw (new) · +1 warm (new)** — `setWarmth(t)`
+  interpolates every rack number between anchors (JSC-verified). Drive it via profile
+  `warmth:` or a `voice.warmth` binding; `/voice warmth -1..1` to audition live.
+  - **Simple story (LIVE game)**: gates now climb it — `-0.5 → -0.25 → +0.25` (somewhat
+    menacing start, audibly thawing), `+1` on release, `-1` (full haunted) on the boot.
+  - **Complex story**: `char.host.mood → voice.warmth` binding — how you treat Clod is
+    how Clod sounds (affronted → haunted, fond → warm). NEEDS A BROWSER LISTEN.
+- **Complex Clod TESTED + PROMOTED** to `stories/clod-bathos.complex.story.js` (archive
+  original untouched): gains `hostile:true` flags (deterministic force/veto, incl. a NEW
+  engine veto for hostile-flagged SIGNAL options — misclassified polite lines can't drain
+  patience), mood-driven voice, release/retry endings, first-person beats, per-option
+  signal `labels` (new `llm.js` prompt format). **Suite: 36/36 ×3 reps GREEN on
+  llama3.2 (3B).**
+- **MODEL FLOOR (measured)**: the 5-way `approach` taxonomy (flattery/friendly/insistent/
+  hostile/other) is NOISE on SmolLM2-1.7B — three prompt formulations, three different
+  confidently-wrong labelings — and CLEAN on llama3.2-3B. The complex story requires
+  ≥3B (WebLLM: `Llama-3.2-3B-Instruct` / `Qwen2.5-3B`); the simple story stays the
+  1.7B-shippable one. Don't prompt-tune below a capability cliff — switch models to test.
+- **Embodiment principle (role-play vs describe)**: the model echoes the BEAT's
+  grammatical person, so beats must be written FIRST PERSON (Clod's own words);
+  second-person beats collide with "'you' = the player" in the render prompt.
+  `llm.js render()` now instructs PERFORM-don't-narrate; the complex beats were
+  rewritten first-person; `renderMustNot` backstops both stories.
+- **Testing runbook: `tests/README.md`** — suites, commands, output reading, the
+  debugging loop, scenario conventions; written for future operators (human or LLM).
+  Suites layout: `tests/scenarios/*.json` = DEFAULT (green on smollm2:1.7b);
+  `tests/scenarios/complex/*.json` = complex suite (`--model llama3.2`).
+
+### PUBLISHED — the game is LIVE on GitHub Pages (2026-06-10 night)
 - **Play URL: https://mreidhorrigan.github.io/Clod-Bathos-Superior-Machine-An-LM-IDN/** —
   repo is PUBLIC, Pages serves the `gh-pages` branch (the built `dist/web`, provider
   `webllm`). Verified live: page + all engine files 200. Needs Chrome/Edge (WebGPU);

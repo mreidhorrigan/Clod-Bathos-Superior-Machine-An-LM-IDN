@@ -180,6 +180,10 @@ Both share the exact same `engine/`, `story.js`, etc.; each build folder gets a 
 
 ## Headless story testing (`storytest.py`)
 
+> **Operating manual: [`tests/README.md`](tests/README.md)** — suites, commands,
+> output interpretation, the debugging loop, and scenario conventions, written for
+> a future operator (human or LLM). Below is the orientation summary.
+
 Iterate on routing + prose with the model LIVE and **no browser, no vis/audio in the
 loop**. `storytest.py` runs the REAL engine (`engine/llm.js` + `engine/engine.js` + a
 story file) under macOS JavaScriptCore (`tests/driver.js`) and bridges its LLM calls to
@@ -343,14 +347,25 @@ A node can ask the LLM to classify a **signal** (a small enum, e.g. tone) in the
 *same* call as routing. Each option maps to deterministic effects you author:
 
 ```js
-signals: { tone: { question: "…", options: {
-  warm:    { inc: { "world.warmth": 1 } },
-  hostile: { inc: { "world.warmth": -1 }, set: { "char.host.mood": "hurt" } },
-} } }
+signals: { tone: { question: "…",
+  labels: {                       // optional per-option glosses — rendered one line
+    warm: "kindness, sympathy",   // per option in the prompt (weak models follow
+    hostile: "insults, threats",  // this format far better than a long question)
+  },
+  options: {
+    warm:    { inc: { "world.warmth": 1 } },
+    hostile: { inc: { "world.warmth": -1 }, set: { "char.host.mood": "hurt" },
+               hostile: true },   // hostile:true = engine VETOES this option unless
+  },                              // the player's words actually contain hostility
+} }
 ```
 The model only *labels* (its strength); your effects own the magnitude. Use this
 instead of asking a small model for raw numbers — measured, the numeric form was
-noise while labels were reliable.
+noise while labels were reliable. **Mind the capability cliff:** a coarse split
+(hostile / not) classifies fine on a 1.7B model, but a 5-way semantic taxonomy
+(e.g. flattery vs friendly vs insistent) measured as NOISE at 1.7B and clean at
+3B — if no prompt formulation stabilises a signal, test a bigger model before
+burning more time (see `tests/README.md`).
 
 ### Rules + `update()` (the per-turn rules engine / GM adjudication)
 
@@ -380,8 +395,27 @@ nodes: { suspicion: { present: "tense", /* … */ } }
 
 The vocabulary is the same as a node's `onEnter` (which still works and **overrides**
 the profile): `glitch` (0..1 level), `burst`, `clock`, plus audio — `preset`
-(`crt|haunted|clean|dry`), `ambient` (number = level, or boolean), `sfx` (same),
+(`crt|menacing|haunted|thaw|warm|clean|dry`), `warmth` (a point on the **voice
+trajectory**, below), `ambient` (number = level, or boolean), `sfx` (same),
 `voice` (boolean). Reuse one profile across many nodes; restyle a whole act in one spot.
+
+**The voice WARMTH TRAJECTORY.** One continuous emotional axis through the voice
+presets, interpolating every rack number between four anchors:
+
+```
+   -1 ───────────── -0.4 ───────────── +0.2 ───────────── +1
+   haunted          menacing           thaw               warm
+   (spectral,       (grand, looming —  (menace cracking,  (open, intimate,
+    ring-mod, long   Clod at rest)      tail shortening)   a touch quicker)
+    cold tail)
+```
+
+Drive it discretely from profiles (`{ warmth: -0.5 }` — the simple Clod's gates
+climb -0.5 → -0.25 → +0.25, then `+1` on release / `-1` on the boot) or
+continuously from a binding (`{ from: "char.host.mood", to: "voice.warmth",
+cases: { affronted: -1, thawing: 0.3, fond: 1 } }` — the complex Clod's voice
+tracks how you treat it). Console/dev: `IDN.voice.setWarmth(t)`,
+`IDN.voice.warmthBag(t)` (inspect the interpolated numbers), `/voice warmth 0.5`.
 
 **Bindings (index by PARAMETER).** Map a world/character value to a presentation
 *target*, re-applied every turn:
@@ -531,7 +565,7 @@ IDN.voice.ambient.setLevel(0.08);          // background bed loudness, 0..1
 IDN.voice.sfx.toggle();                    // glitch blips on/off    (or /voice sfx off)
 IDN.voice.sfx.setLevel(0.3);               // glitch-blip loudness, 0..1
 ```
-Slash commands: `/voice` · `/voice on|off` · `/voice test` · `/voice crt|haunted|clean|dry` · `/voice ambient on|off` · `/voice sfx on|off`.
+Slash commands: `/voice` · `/voice on|off` · `/voice test` · `/voice crt|menacing|haunted|thaw|warm|clean|dry` · `/voice warmth -1..1` · `/voice ambient on|off` · `/voice sfx on|off`.
 
 > **License note (matters if you redistribute this template).** SAM / `sam-js` is a
 > reverse-engineering of 30-year-old commercial software; its own README says *"Use

@@ -103,6 +103,28 @@
       detune: -300, playbackRate: 0.94,
       reactiveAmount: 1.1,
     },
+    // menace cracking — shorter tail, lifting pitch; first warmth showing through
+    thaw: {
+      hp: 170, lp: 3800, lpByGlitch: 0.35,
+      crushBits: 10, crushBitsByGlitch: 2.0,
+      crushHz: 14000, crushHzByGlitch: 0.4,
+      drive: 0.18,
+      verbWet: 0.20, verbSeconds: 1.0, verbDecay: 2.8,
+      ringWet: 0.0, ringHz: 0,
+      detune: -40, playbackRate: 0.99,
+      reactiveAmount: 1.0,
+    },
+    // genuinely warm — open, intimate, a touch quicker; Clod gone fond
+    warm: {
+      hp: 140, lp: 5200, lpByGlitch: 0.2,
+      crushBits: 12, crushBitsByGlitch: 1.0,
+      crushHz: 18000, crushHzByGlitch: 0.25,
+      drive: 0.10,
+      verbWet: 0.13, verbSeconds: 0.7, verbDecay: 3.0,
+      ringWet: 0.0, ringHz: 0,
+      detune: 25, playbackRate: 1.02,
+      reactiveAmount: 0.8,
+    },
     // readable retro speech-synth — light shaping only
     clean: {
       hp: 120, lp: 6500, lpByGlitch: 0.15,
@@ -126,6 +148,40 @@
       reactiveAmount: 0,
     },
   };
+
+  /* ---------------------------------------------------------------------------
+   * WARMTH TRAJECTORY — one continuous emotional axis through the presets:
+   *
+   *   -1 ───────── -0.4 ───────── +0.2 ───────── +1
+   *   haunted      menacing       thaw           warm
+   *   (spectral)   (at rest)      (cracking)     (fond)
+   *
+   * setWarmth(t) piecewise-interpolates every rack number between those anchor
+   * presets and applies the result (registered as PRESETS.trajectory so every
+   * name-based path — playNext, /voice — keeps working). Drive it from a story:
+   *   profiles:  { warmth: -0.5, glitch: 0.35 }            (a stop per node)
+   *   bindings:  { from: "world.regard", to: "voice.warmth", in:[0,6], out:[-0.5,1] }
+   * ------------------------------------------------------------------------- */
+  var WARMTH_ANCHORS = [
+    [-1.0, "haunted"], [-0.4, "menacing"], [0.2, "thaw"], [1.0, "warm"],
+  ];
+  function warmthBag(t) {
+    t = clamp(+t || 0, -1, 1);
+    var lo = WARMTH_ANCHORS[0], hi = WARMTH_ANCHORS[WARMTH_ANCHORS.length - 1];
+    for (var i = 0; i < WARMTH_ANCHORS.length - 1; i++) {
+      if (t >= WARMTH_ANCHORS[i][0] && t <= WARMTH_ANCHORS[i + 1][0]) {
+        lo = WARMTH_ANCHORS[i]; hi = WARMTH_ANCHORS[i + 1]; break;
+      }
+    }
+    var a = PRESETS[lo[1]], b = PRESETS[hi[1]];
+    var f = (hi[0] === lo[0]) ? 0 : (t - lo[0]) / (hi[0] - lo[0]);
+    var bag = {};
+    Object.keys(a).forEach(function (k) {
+      var av = a[k], bv = (k in b) ? b[k] : av;
+      bag[k] = (typeof av === "number" && typeof bv === "number") ? av + (bv - av) * f : av;
+    });
+    return bag;
+  }
 
   /* ---------------------------------------------------------------------------
    * PER-CHARACTER VOICES — SAM synth params (pitch/speed/mouth/throat) plus a
@@ -643,6 +699,20 @@
     toggle: function () { return this.setEnabled(!this.enabled); },
 
     get preset() { return activePreset(); },
+
+    /* Warmth trajectory: t in [-1 (haunted) … -0.4 (menacing) … +0.2 (thaw) … +1 (warm)].
+     * Interpolates the rack between the anchor presets and makes it the active
+     * voice (as the 'trajectory' preset). Returns the clamped t. */
+    get warmth() { return state.warmth; },
+    warmthBag: warmthBag,   // introspection: the interpolated rack numbers for a given t
+    setWarmth: function (t) {
+      t = clamp(+t || 0, -1, 1);
+      PRESETS.trajectory = warmthBag(t);
+      state.warmth = t;
+      this.setPreset("trajectory");
+      return t;
+    },
+
     setPreset: function (name) {
       if (!PRESETS[name]) { console.warn("[IDN voice] unknown preset:", name, "— have:", this.presets.join(", ")); return this.preset; }
       state.preset = name; state.presetForced = true;

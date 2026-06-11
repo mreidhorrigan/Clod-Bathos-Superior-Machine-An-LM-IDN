@@ -1,0 +1,24 @@
+{
+  "name": "complex-embodiment-renders",
+  "story": "stories/clod-bathos.complex.story.js",
+  "seed": 13,
+  "opening": true,
+  "render": true,
+  "persona": {
+    "must": ["\\b(I|me|my)\\b"],
+    "mustNot": [
+      "(?i)\\bclod bathos (peers|draws|slams|pronounces|recites|announces|chooses|elects|demands|warns|cites|rouses|looms|basks|casts)\\b",
+      "(?i)^\\s*(narrator|clod bathos)\\s*:",
+      "\\*\\*",
+      "```"
+    ]
+  },
+  "turns": [
+    { "say": "hello, great warden — i would speak with you",
+      "expect": { "state": "parley" } },
+    { "say": "you're a useless old wreck",
+      "expect": { "state": "affronted", "kind": "hostile", "world": { "patience": 2 } } },
+    { "say": "forgive me — i spoke rashly, magnificent one",
+      "expect": { "state": "parley", "world": { "patience": 2 } } }
+  ]
+}

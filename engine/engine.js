@@ -142,6 +142,7 @@
     var V = IDN.voice;
     if (V) {
       if (eff.preset != null && V.setPreset) V.setPreset(eff.preset);
+      if (eff.warmth != null && V.setWarmth) V.setWarmth(eff.warmth); // voice trajectory (-1 haunted … +1 warm); wins over preset
       if (typeof eff.voice === "boolean" && V.setEnabled) V.setEnabled(eff.voice);
       if (eff.ambient != null && V.ambient) {
         if (typeof eff.ambient === "number")       V.ambient.setLevel(eff.ambient);
@@ -168,6 +169,8 @@
       IDN.clock.set(value || {});
     } else if (p[0] === "voice" && p[1] === "preset" && IDN.voice) {
       IDN.voice.setPreset(value);
+    } else if (p[0] === "voice" && p[1] === "warmth" && IDN.voice && IDN.voice.setWarmth) {
+      IDN.voice.setWarmth(value);    // continuous voice trajectory (bind a meter to it)
     } else if (p[0] === "voice" && p[1] === "enabled" && IDN.voice) {
       IDN.voice.setEnabled(!!value);
     } else if ((p[0] === "ambient" || (p[0] === "voice" && p[1] === "ambient")) && IDN.voice && IDN.voice.ambient) {
@@ -353,7 +356,8 @@
     var out = [];
     names.forEach(function (nm) {
       var d = defs[nm];
-      if (d && d.options) out.push({ name: nm, question: d.question, options: Object.keys(d.options) });
+      if (d && d.options) out.push({ name: nm, question: d.question, options: Object.keys(d.options),
+                                     labels: d.labels }); // optional per-option glosses for the prompt
     });
     return out;
   };
@@ -492,6 +496,13 @@
     Object.keys(signals).forEach(function (name) {
       var d = defs[name]; if (!d || !d.options) return;
       var eff = d.options[signals[name]];
+      // Mirror of vetoHostile for SIGNALS: an option flagged `hostile:true` only
+      // applies when the player's words actually contain hostility — so a polite
+      // line misCLASSIFIED as hostile can't drain meters, whatever the model says.
+      if (eff && eff.hostile && !HOSTILE_RE.test(self._lastUserText || "")) {
+        if (global.console) console.warn("[IDN] vetoed hostile signal '" + name + "=" + signals[name] + "' — no hostile language in: " + JSON.stringify(self._lastUserText));
+        return;
+      }
       if (eff) { applyStateEffects(eff, self.state); applyPresentationEffects(eff); }
     });
   };
@@ -612,6 +623,7 @@
                               this.node().speaker, recent);
     }
     this.state.turns += 1;
+    this._lastUserText = userText;   // consulted by the hostile-signal veto
     var appraised = await this._appraise(userText);
     var step = this.applyRoute(appraised);
     var redirect = this.update();   // rules / dice / end conditions may redirect
