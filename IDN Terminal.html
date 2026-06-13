@@ -54,12 +54,49 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
+  /* ════════════════════════════════════════════════════════════════════════
+     CLOD PALETTE — the ONE place to retune the game's colours.
+
+     Two BRAND ANCHORS are shared with matthorrigan.com (the bio site), so the
+     game reads as part of the same world:
+       --brand-orange  #f28b46  → the amber CRT family is harmonized toward it
+       --brand-blue    #c3f0ff  → the success / release screen is built on it
+     Each anchor also has an "-rgb" triplet for rgba() glows.
+
+     To restyle: change an anchor, or edit a ramp value below. Everything
+     downstream uses these variables (no hard-coded hexes elsewhere). NOTE: the
+     "-rgb" vars must be kept in sync with their hex twin by hand (CSS can't
+     derive one from the other portably).
+     ════════════════════════════════════════════════════════════════════════ */
   :root{
-    --amber:        #ffb000;
-    --amber-bright: #ffd866;
-    --amber-dim:    #b87900;
-    --amber-faint:  #6b4500;
+    /* —— brand anchors (from the bio site) —— */
+    --brand-orange:     #f28b46;
+    --brand-orange-rgb: 242,139,70;
+    --brand-blue:       #c3f0ff;
+    --brand-blue-rgb:   195,240,255;
+
+    /* —— TERMINAL palette: amber CRT, tuned toward --brand-orange —— */
+    --amber:        #ff9d42;    /* primary text + glow (a luminous sibling of the brand orange) */
+    --amber-bright: #ffc479;    /* highlights: player echo, sys-bright, caret */
+    --amber-dim:    #c2702f;    /* secondary text, dashed rules, scrollbar track */
+    --amber-faint:  #6e3d18;    /* faintest: scrollbar thumb, disabled */
+    --amber-rgb:      255,157,66;  /* = --amber, for rgba() text-glow washes (keep in sync) */
+    --amber-deep-rgb: 230,108,30;  /* deeper halo behind the glow */
     --scan:         rgba(0,0,0,.28);
+
+    /* —— terminal backgrounds (warm near-black) —— */
+    --bg:        var(--bg);       /* page + screen base */
+    --screen-0:  #2a1a00;       /* CRT gradient: centre → */
+    --screen-1:  #1a0f00;       /*               mid (also the loader centre) */
+    --screen-2:  #0d0700;       /*               → edge */
+
+    /* —— RELEASE / SUCCESS palette: bright sky, built on --brand-blue —— */
+    --release-sky-0:   #f2fcff;     /* radial gradient: centre (brightest) → */
+    --release-sky-1:   #d6f4ff;     /*                  mid */
+    --release-sky-2:   #b3e6fb;     /*                  → edge (deeper sky) */
+    --release-ink:     #18617e;     /* title — deep readable blue */
+    --release-ink-2:   #3f86a3;     /* subtitle */
+    --release-field-rgb: 126,178,82;/* the green grass field at the foot (set alpha 0 to drop) */
 
     /* glitch-driven (set from JS) */
     --tear-x: 0px;
@@ -70,7 +107,7 @@
   }
 
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:#0a0600;color:var(--amber);font-family:"IBM Plex Mono", ui-monospace, monospace;}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--amber);font-family:"IBM Plex Mono", ui-monospace, monospace;}
   body{
     overflow:hidden;
   }
@@ -79,19 +116,19 @@
   .screen-wrap{
     position:fixed; inset:0;
     overflow:hidden;
-    background:#0a0600;
+    background:var(--bg);
     border-radius: 14px;   /* clean, static CRT corner — pure CSS, can't flicker */
   }
   .screen{
     position:absolute; inset:0;
-    background: radial-gradient(ellipse at center, #2a1a00 0%, #1a0f00 55%, #0d0700 100%);
+    background: radial-gradient(ellipse at center, var(--screen-0) 0%, var(--screen-1) 55%, var(--screen-2) 100%);
     transform: perspective(1400px);
     overflow:hidden;
     color: var(--amber);
     text-shadow:
-      0 0 1px rgba(255,176,0,.9),
-      0 0 4px rgba(255,176,0,.55),
-      0 0 14px rgba(255,140,0,.25);
+      0 0 1px rgba(var(--amber-rgb),.9),
+      0 0 4px rgba(var(--amber-rgb),.55),
+      0 0 14px rgba(var(--amber-deep-rgb),.25);
   }
 
   /* scanlines — continuously ROLL down the screen (CRT vertical drift).
@@ -117,7 +154,7 @@
   /* slow flicker */
   .flicker{
     position:absolute;inset:0;pointer-events:none;z-index:7;
-    background: rgba(255,176,0,.02);
+    background: rgba(var(--amber-rgb),.02);
     animation: flicker 7s infinite steps(1);
   }
   @keyframes flicker{
@@ -159,8 +196,8 @@
   .burn{
     position:absolute;inset:0;pointer-events:none;z-index:3;
     background:
-      radial-gradient(circle at 8% 12%, rgba(255,176,0,.05), transparent 22%),
-      radial-gradient(circle at 92% 88%, rgba(255,176,0,.04), transparent 25%);
+      radial-gradient(circle at 8% 12%, rgba(var(--brand-orange-rgb),.05), transparent 22%),
+      radial-gradient(circle at 92% 88%, rgba(var(--brand-orange-rgb),.04), transparent 25%);
     mix-blend-mode: screen;
   }
 
@@ -248,9 +285,9 @@
     padding-left: var(--ji);
     /* phosphor: stronger glow base */
     text-shadow:
-      0 0 1px rgba(255,176,0,.9),
-      0 0 5px rgba(255,176,0,.55),
-      0 0 16px rgba(255,140,0,.25);
+      0 0 1px rgba(var(--amber-rgb),.9),
+      0 0 5px rgba(var(--amber-rgb),.55),
+      0 0 16px rgba(var(--amber-deep-rgb),.25);
   }
 
   /* character-overlap glitch: split chars get inline negative offsets */
@@ -309,8 +346,8 @@
     text-shadow:
       calc(var(--chroma-x) * -1) 0 0 rgba(255, 60, 0, .85),
       var(--chroma-x) 0 0 rgba(120, 220, 255, .55),
-      0 0 5px rgba(255,176,0,.55),
-      0 0 16px rgba(255,140,0,.25);
+      0 0 5px rgba(var(--amber-rgb),.55),
+      0 0 16px rgba(var(--amber-deep-rgb),.25);
   }
 
   /* input row — just a blinking caret, no instructions */
@@ -344,7 +381,7 @@
     flex:0 0 auto; width:34px; height:34px; margin-left:10px; padding:0;
     background:transparent; border:1px solid var(--amber-faint); border-radius:50%;
     color:var(--amber-dim); cursor:pointer; font-size:15px; line-height:1;
-    text-shadow:0 0 4px rgba(255,176,0,.4);
+    text-shadow:0 0 4px rgba(var(--amber-rgb),.4);
     transition:color .15s, border-color .15s, box-shadow .15s;
     -webkit-appearance:none; appearance:none;
   }
@@ -363,14 +400,14 @@
   /* boot overlay */
   .boot{
     position:absolute;inset:0;z-index:9;
-    background:#0a0600;
+    background:var(--bg);
     color:var(--amber);
     font-family:"VT323",monospace;
     font-size: 22px;
     padding: 28px;
     white-space: pre;
     overflow:hidden;
-    text-shadow: 0 0 4px rgba(255,176,0,.6);
+    text-shadow: 0 0 4px rgba(var(--amber-rgb),.6);
   }
   .boot.fade{ animation: bootfade .7s ease forwards; }
   @keyframes bootfade{to{ opacity:0; visibility:hidden }}
@@ -378,11 +415,11 @@
   /* loading screen — the first click/keypress unlocks audio (autoplay policy) */
   .loader{
     position:fixed; inset:0; z-index:20;
-    background: radial-gradient(ellipse at center, #1a0f00 0%, #0a0600 70%);
+    background: radial-gradient(ellipse at center, var(--screen-1) 0%, var(--bg) 70%);
     color:var(--amber);
     display:flex; align-items:center; justify-content:center; text-align:center;
     font-family:"VT323", monospace; cursor:pointer; outline:none;
-    text-shadow: 0 0 6px rgba(255,176,0,.6);
+    text-shadow: 0 0 6px rgba(var(--amber-rgb),.6);
   }
   .loader.hide{ animation: loaderfade .6s ease forwards; }
   @keyframes loaderfade{ to{ opacity:0; visibility:hidden; } }
@@ -392,22 +429,24 @@
   @keyframes promptblink{ 50%{ opacity:.2 } }
 
   /* release screen — the BRIGHT ending. Shown when the story lands on a node
-     flagged `release:true` (Weebot freed): the amber dark dissolves into light. */
+     flagged `release:true` (Weebot freed): the amber dark dissolves into open
+     BLUE sky (the bio site's --brand-blue) over a faint green field. Colours
+     come from the RELEASE palette in :root. */
   .release{
     position:fixed; inset:0; z-index:21; display:none;
-    background: radial-gradient(ellipse at 50% 36%, #fffdf2 0%, #fdf6dc 48%, #f1e8cd 100%);
-    color:#6b5210;
+    background: radial-gradient(ellipse at 50% 36%, var(--release-sky-0) 0%, var(--release-sky-1) 48%, var(--release-sky-2) 100%);
+    color:var(--release-ink-2);
     align-items:center; justify-content:center; text-align:center;
     font-family:"VT323", monospace; cursor:pointer; outline:none;
     opacity:0; transition: opacity 1.8s ease;
-    text-shadow: 0 0 14px rgba(255,238,170,.9);
+    text-shadow: 0 0 14px rgba(var(--brand-blue-rgb),.9);
   }
   .release.lit{ opacity:1; }
   .release-field{ position:absolute; left:0; right:0; bottom:0; height:26%;
-    background: linear-gradient(to top, rgba(126,178,82,.32), rgba(126,178,82,0)); }
+    background: linear-gradient(to top, rgba(var(--release-field-rgb),.32), rgba(var(--release-field-rgb),0)); }
   .release-inner{ position:relative; }
-  .release-title{ font-size:72px; letter-spacing:.18em; color:#8a6a00; }
-  .release-sub{ font-size:22px; margin-top:8px; letter-spacing:.12em; color:#a08530; }
+  .release-title{ font-size:72px; letter-spacing:.18em; color:var(--release-ink); }
+  .release-sub{ font-size:22px; margin-top:8px; letter-spacing:.12em; color:var(--release-ink-2); }
   .release-prompt{ margin-top:54px; font-size:24px; animation: promptblink 1.1s steps(1) infinite; }
 
   @media (max-width: 640px){

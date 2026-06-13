@@ -6,9 +6,26 @@ works*; this file is *where things stand* and *what's next*.
 
 ---
 
-## Current state — newest first (updated 2026-06-11)
+## Current state — newest first (updated 2026-06-13)
 
-### Voice warmth trajectory + complex story tested & promoted (NEWEST, 2026-06-11)
+### Colour palette consolidated + harmonized with the bio site (NEWEST, 2026-06-13)
+- **`CLOD PALETTE`**: one labelled `:root` block at the top of the HTML `<style>` is now the
+  single place to retune colour — no hard-coded hexes elsewhere (backgrounds, amber glows, the
+  release screen all reference vars). Easy to adjust in future, as requested.
+- **Two brand anchors shared with matthorrigan.com**: `--brand-orange #f28b46` and
+  `--brand-blue #c3f0ff` (lifted from the bio site's `--secondcolor`/`--favcolor`).
+- **Amber CRT harmonized toward the orange**: primary `--amber` shifted `#ffb000 → #ff9d42`
+  (a luminous sibling of the brand orange); ramp `--amber-bright/-dim/-faint` retuned to match;
+  ambient screen-corner glows now use the literal `--brand-orange`. Contrast verified
+  (main text AAA, secondary AA).
+- **Success/release screen rebuilt on the blue**: warm-cream → bright `--brand-blue` sky
+  (`--release-sky-0..2`) with deep-blue title/sub (`--release-ink/-ink-2`) and the
+  blue text-glow; the green grass field kept as a faint accent (`--release-field-rgb`, set
+  alpha 0 to drop). Title/sub contrast AA / AA-large.
+- Built clean into `dist/web`; **redeployed to Pages**. Browser eyeball still worthwhile
+  (colour is the one thing the harness can't check), but values + WCAG contrast are verified.
+
+### Voice warmth trajectory + complex story tested & promoted (2026-06-11)
 - **VOICE TRAJECTORY** (`engine/voice.js`): one warmth axis through the presets —
   **-1 haunted · -0.4 menacing · +0.2 thaw (new) · +1 warm (new)** — `setWarmth(t)`
   interpolates every rack number between anchors (JSC-verified). Drive it via profile

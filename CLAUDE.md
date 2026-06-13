@@ -108,6 +108,12 @@ asked to **classify, not quantify** (numeric estimation is noisy — kept off by
 - **CRT / glitch visuals** — `<style>` + `5. GLITCH ENGINE` in the HTML; runtime API
   `IDN.glitch` / `IDN.clock`. A bright **scan bar** sweeps down; the screen edge is a clean
   static rounded rect (the old re-rolled ragged edge was removed — never re-roll a clip-path).
+- **Colour palette (`CLOD PALETTE`)** — ONE labelled `:root` block at the top of the HTML
+  `<style>` is the single place to retune colour. Two brand anchors are shared with the bio
+  site (matthorrigan.com): `--brand-orange #f28b46` (the amber CRT family is harmonized toward
+  it) and `--brand-blue #c3f0ff` (the success/release screen is built on it). Ramps: `--amber*`
+  (+ `--amber-rgb`/`--amber-deep-rgb` for glows), `--bg`/`--screen-0..2`, `--release-*`. No
+  colour is hard-coded elsewhere; keep each `-rgb` triplet in sync with its hex twin by hand.
 - **Presentation index** — `story.presentation` ties glitch+audio to state in ONE place:
   `profiles` (named look/sound a node picks via `present:` — index by STATE) + `bindings`
   (world/char param → presentation target each turn — index by PARAMETER). **Precedence:
