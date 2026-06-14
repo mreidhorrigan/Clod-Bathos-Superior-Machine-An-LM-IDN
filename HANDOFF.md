@@ -6,9 +6,15 @@ works*; this file is *where things stand* and *what's next*.
 
 ---
 
-## Current state — newest first (updated 2026-06-13)
+## Current state — newest first (updated 2026-06-14)
 
-### Colour palette consolidated + harmonized with the bio site (NEWEST, 2026-06-13)
+### Splash: "needs a WebGPU browser" note (NEWEST, 2026-06-14)
+- The loader now carries a brief faint line — *"Runs an AI model in your browser — needs a
+  WebGPU browser (Chrome, Edge, or Arc). First load downloads the model."* — shown ONLY when
+  the active provider is `webllm` (the Ollama/`file://` folder build needs no WebGPU, so it
+  stays hidden there). `.loader-note` in the HTML; revealed in the loader-theming boot block.
+
+### Colour palette consolidated + harmonized with the bio site (2026-06-13)
 - **`CLOD PALETTE`**: one labelled `:root` block at the top of the HTML `<style>` is now the
   single place to retune colour — no hard-coded hexes elsewhere (backgrounds, amber glows, the
   release screen all reference vars). Easy to adjust in future, as requested.
