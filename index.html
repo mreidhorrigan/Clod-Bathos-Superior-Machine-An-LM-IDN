@@ -1,0 +1,1847 @@
+<!doctype html>
+<!--
+  ============================================================================
+  IDN TERMINAL  ·  degraded amber-CRT interface for an LLM-driven narrative
+  ============================================================================
+
+  WHAT THIS IS
+    A single, self-contained HTML file: a glitchy CRT terminal front-end for an
+    Interactive Digital Narrative (IDN). The user types at the blinking cursor;
+    the "narrator" replies are produced by a backend LLM (intended: a local
+    model served by Ollama). No build step, no dependencies, no framework —
+    open it in a browser and it runs.
+
+  HOW IT'S ORGANISED  (search the <script> for these ALL-CAPS banner comments)
+    1. CONFIG ............ the ONE place you edit. Backend, model, prompt, speed.
+    2. BACKEND ADAPTERS .. queryBackend() + the mock and Ollama implementations.
+    3. RUNTIME API ....... window.IDN — drive glitch + clock from game state.
+    4. RENDERING ......... transcript, typewriter reveal, slash-commands.
+    5. GLITCH ENGINE ..... visual degradation, scheduler, effect primitives.
+    6. BOOT .............. the power-on sequence + opening narration.
+
+  THE NARRATOR IS ALSO SPOKEN
+    engine/voice.js renders each line with a tiny pure-JS TTS (SAM, vendored in
+    engine/vendor/) and routes the audio through a Web Audio effects rack, so the
+    voice is PROCESSED sound design — band-limited, bit-crushed, reverbed — not a
+    screen-reader. Toggle / retune it live with the /voice command or the
+    window.IDN.voice API. Configure it in the CONFIG.voice block below.
+
+  HOOKING UP A LOCAL LLM (Ollama)  —  the only step that matters
+    a. Install Ollama and pull a model:   ollama pull llama3.1
+    b. In CONFIG below, set   backend: 'ollama'   (or leave 'auto').
+    c. Set   CONFIG.ollama.model   to the model you pulled.
+    d. Ollama must allow this page's origin. Start it with:
+         OLLAMA_ORIGINS='*' ollama serve
+       (or restrict to your exact origin). Otherwise the browser blocks the
+       request with a CORS error and the terminal falls back to mock replies.
+
+    The entire integration surface is ONE function: queryBackend(userText).
+    It takes the player's text, returns a Promise<string> of the narrator's
+    reply. Everything else (typing effect, glitch, history) is already wired.
+
+  BACKEND MODES (CONFIG.backend)
+    'auto'   — try Ollama; if it can't be reached, use the offline mock.  (default)
+    'ollama' — always talk to Ollama; show an error in-terminal on failure.
+    'mock'   — never touch the network; canned narrator. Good for design work.
+  ============================================================================
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>IDN Terminal</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* ════════════════════════════════════════════════════════════════════════
+     CLOD PALETTE — the ONE place to retune the game's colours.
+
+     Two BRAND ANCHORS are shared with matthorrigan.com (the bio site), so the
+     game reads as part of the same world:
+       --brand-orange  #f28b46  → the amber CRT family is harmonized toward it
+       --brand-blue    #c3f0ff  → the success / release screen is built on it
+     Each anchor also has an "-rgb" triplet for rgba() glows.
+
+     To restyle: change an anchor, or edit a ramp value below. Everything
+     downstream uses these variables (no hard-coded hexes elsewhere). NOTE: the
+     "-rgb" vars must be kept in sync with their hex twin by hand (CSS can't
+     derive one from the other portably).
+     ════════════════════════════════════════════════════════════════════════ */
+  :root{
+    /* —— brand anchors (from the bio site) —— */
+    --brand-orange:     #f28b46;
+    --brand-orange-rgb: 242,139,70;
+    --brand-blue:       #c3f0ff;
+    --brand-blue-rgb:   195,240,255;
+
+    /* —— TERMINAL palette: amber CRT, tuned toward --brand-orange —— */
+    --amber:        #ff9d42;    /* primary text + glow (a luminous sibling of the brand orange) */
+    --amber-bright: #ffc479;    /* highlights: player echo, sys-bright, caret */
+    --amber-dim:    #c2702f;    /* secondary text, dashed rules, scrollbar track */
+    --amber-faint:  #6e3d18;    /* faintest: scrollbar thumb, disabled */
+    --amber-rgb:      255,157,66;  /* = --amber, for rgba() text-glow washes (keep in sync) */
+    --amber-deep-rgb: 230,108,30;  /* deeper halo behind the glow */
+    --scan:         rgba(0,0,0,.28);
+
+    /* —— terminal backgrounds (warm near-black) —— */
+    --bg:        var(--bg);       /* page + screen base */
+    --screen-0:  #2a1a00;       /* CRT gradient: centre → */
+    --screen-1:  #1a0f00;       /*               mid (also the loader centre) */
+    --screen-2:  #0d0700;       /*               → edge */
+
+    /* —— RELEASE / SUCCESS palette: bright sky, built on --brand-blue —— */
+    --release-sky-0:   #f2fcff;     /* radial gradient: centre (brightest) → */
+    --release-sky-1:   #d6f4ff;     /*                  mid */
+    --release-sky-2:   #b3e6fb;     /*                  → edge (deeper sky) */
+    --release-ink:     #18617e;     /* title — deep readable blue */
+    --release-ink-2:   #3f86a3;     /* subtitle */
+    --release-field-rgb: 126,178,82;/* the green grass field at the foot (set alpha 0 to drop) */
+
+    /* glitch-driven (set from JS) */
+    --tear-x: 0px;
+    --tear-y: 0px;
+    --chroma-x: 0px;
+    --skew: 0deg;
+    --flash: 0;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--amber);font-family:"IBM Plex Mono", ui-monospace, monospace;}
+  body{
+    overflow:hidden;
+  }
+
+  /* ---------- the screen (full viewport) ---------- */
+  .screen-wrap{
+    position:fixed; inset:0;
+    overflow:hidden;
+    background:var(--bg);
+    border-radius: 14px;   /* clean, static CRT corner — pure CSS, can't flicker */
+  }
+  .screen{
+    position:absolute; inset:0;
+    background: radial-gradient(ellipse at center, var(--screen-0) 0%, var(--screen-1) 55%, var(--screen-2) 100%);
+    transform: perspective(1400px);
+    overflow:hidden;
+    color: var(--amber);
+    text-shadow:
+      0 0 1px rgba(var(--amber-rgb),.9),
+      0 0 4px rgba(var(--amber-rgb),.55),
+      0 0 14px rgba(var(--amber-deep-rgb),.25);
+  }
+
+  /* scanlines — continuously ROLL down the screen (CRT vertical drift).
+     The travel (96px) is exactly 32× the 3px line period, so the loop is
+     seamless; at 60px/s it's ~1px per frame = perfectly smooth. Slow it down by
+     raising the 1.6s duration; freeze it by removing the `animation` line. */
+  .screen::before{
+    content:"";position:absolute;inset:-2px;pointer-events:none;
+    background: repeating-linear-gradient(to bottom, transparent 0 2px, var(--scan) 2px 3px);
+    mix-blend-mode: multiply;
+    z-index: 5;
+    animation: scanroll 1.6s linear infinite;
+  }
+  @keyframes scanroll{ from{ background-position: 0 0; } to{ background-position: 0 96px; } }
+  /* vignette + curvature */
+  .screen::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:
+      radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%),
+      radial-gradient(ellipse at 50% 0%, rgba(255,210,120,.06), transparent 60%);
+    z-index: 6;
+  }
+  /* slow flicker */
+  .flicker{
+    position:absolute;inset:0;pointer-events:none;z-index:7;
+    background: rgba(var(--amber-rgb),.02);
+    animation: flicker 7s infinite steps(1);
+  }
+  @keyframes flicker{
+    0%,96%,100%{opacity:.0}
+    97%{opacity:.18}
+    98%{opacity:.04}
+    99%{opacity:.22}
+  }
+  .sweep{
+    position:absolute;left:0;right:0;height:90px;pointer-events:none;z-index:4;
+    background: linear-gradient(180deg, transparent, rgba(255,200,80,.05), transparent);
+    animation: sweep 9s linear infinite;
+  }
+  @keyframes sweep{0%{transform:translateY(-120px)}100%{transform:translateY(110%)}}
+
+  /* SCAN BAR — a single bright electron-beam line that sweeps straight down the
+     screen and loops forever. THIS is the scan line you can actually track (the
+     fine .screen::before grating moves too, but a uniform 1px grating reads as
+     static). It's additive (screen blend) so it brightens whatever it crosses,
+     and fades to transparent at its own top/bottom so the loop wrap is seamless.
+     Tune speed via the 7s; raise the centre alpha for a stronger beam. */
+  .scanbar{
+    position:absolute; left:-2%; right:-2%; top:0; height:130px;
+    pointer-events:none; z-index:8;
+    mix-blend-mode: screen;
+    background: linear-gradient(to bottom,
+      rgba(255,214,128,0)   0%,
+      rgba(255,214,128,.06) 38%,
+      rgba(255,236,180,.20) 49%,
+      rgba(255,248,210,.42) 50%,
+      rgba(255,236,180,.20) 51%,
+      rgba(255,214,128,.06) 62%,
+      rgba(255,214,128,0)  100%);
+    will-change: transform;
+    animation: scanbar 7s linear infinite;
+  }
+  @keyframes scanbar{ 0%{ transform: translateY(-130px); } 100%{ transform: translateY(100vh); } }
+
+  .burn{
+    position:absolute;inset:0;pointer-events:none;z-index:3;
+    background:
+      radial-gradient(circle at 8% 12%, rgba(var(--brand-orange-rgb),.05), transparent 22%),
+      radial-gradient(circle at 92% 88%, rgba(var(--brand-orange-rgb),.04), transparent 25%);
+    mix-blend-mode: screen;
+  }
+
+  /* ---------- GLITCH LAYERS ---------- */
+  /* white-ish flash */
+  .flash{
+    position:absolute; inset:0; pointer-events:none; z-index: 11;
+    background: rgba(255, 220, 140, 1);
+    opacity: var(--flash);
+    mix-blend-mode: screen;
+    transition: opacity 60ms linear;
+  }
+  /* horizontal tear: a band cut out and offset by --tear-x at vertical position --tear-y */
+  .tear{
+    position:absolute; left:0; right:0; height: 0px; pointer-events:none; z-index: 10;
+    top: var(--tear-y);
+    transform: translateX(var(--tear-x));
+    will-change: transform, height, top;
+  }
+
+  /* ---------- content layout ---------- */
+  .content{
+    position:absolute;inset:0;z-index:2;
+    display:grid;
+    grid-template-rows: auto 1fr auto;
+    padding: 22px 32px;
+    font-family: "VT323","IBM Plex Mono", monospace;
+    font-size: 22px;
+    line-height: 1.25;
+    /* horizontal-only transforms; NO vertical wobble */
+    transform: skewX(var(--skew));
+    transition: transform 280ms ease-out;
+  }
+
+  /* chromatic split — sits over content and clones it via JS-set text-shadow on .line */
+  /* (handled via CSS variables on individual lines, see .line below) */
+
+  /* ---------- ragged status bar ---------- */
+  .statusbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    border-bottom: 1px dashed var(--amber-dim);
+    padding-bottom: 8px;
+    font-size: 20px;
+    letter-spacing: .04em;
+    position: relative;
+  }
+  .statusbar .left,.statusbar .right{
+    display:flex;gap: 22px;align-items:flex-end;white-space:nowrap;
+  }
+  .statusbar .left > *, .statusbar .right > *{
+    flex-shrink:0;
+    /* each item gets its own micro-offset via inline style assigned in JS */
+  }
+  .statusbar .sys{color:var(--amber-bright)}
+  .dot{
+    display:inline-block;width:7px;height:7px;border-radius:50%;
+    background:var(--amber);box-shadow:0 0 6px var(--amber);
+    animation: pulse 2.2s infinite;
+    vertical-align: 2px;
+  }
+  @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+
+  .transcript{
+    overflow-y:auto;
+    overflow-x:hidden;
+    padding: 18px 4px 18px 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--amber-dim) transparent;
+  }
+  .transcript::-webkit-scrollbar{width:8px}
+  .transcript::-webkit-scrollbar-thumb{background:var(--amber-faint);border-radius:0}
+
+  /* ---------- lines (ragged + separated) ---------- */
+  .line{
+    margin: 0;
+    padding: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    /* per-line raggedness is HORIZONTAL ONLY now — no vertical/rotation jitter */
+    --jx: 0px;  /* horizontal jitter */
+    --ji: 0px;  /* indent */
+    transform: translateX(var(--jx));
+    padding-left: var(--ji);
+    /* phosphor: stronger glow base */
+    text-shadow:
+      0 0 1px rgba(var(--amber-rgb),.9),
+      0 0 5px rgba(var(--amber-rgb),.55),
+      0 0 16px rgba(var(--amber-deep-rgb),.25);
+  }
+
+  /* character-overlap glitch: split chars get inline negative offsets */
+  .line .glyph{
+    display: inline-block;
+    transform: translate(var(--gx,0), 0);
+    will-change: transform;
+  }
+
+  /* clear vertical separation between turns */
+  .line.sys   { color: var(--amber-dim); margin: 14px 0 14px 0; }
+  .line.you   { color: var(--amber-bright); margin: 22px 0 10px 0; font-weight: 500;}
+  .line.you::before {
+    content: "WEEBOT 0.nil › ";
+    color: var(--amber);
+    margin-right: 2px;
+  }
+  .line.bot   {
+    color: var(--amber);
+    margin: 0 0 14px 0;
+  }
+  .line.bot::before{
+    content: "";
+  }
+  /* leading sigil on the FIRST bot paragraph of a turn */
+  .line.bot.turn-start{
+    margin-top: 6px;
+  }
+  .line.bot.turn-start::before{
+    content: "·· ";
+    color: var(--amber-dim);
+  }
+  /* ragged separator BEFORE a user turn */
+  .turn-rule{
+    color: var(--amber-faint);
+    margin: 18px 0 0 0;
+    white-space: pre;
+    transform: translateX(var(--jx, 0px));
+    --jx: 0px;
+    font-size: 16px;
+    letter-spacing: .1em;
+    user-select: none;
+  }
+
+  .line.err   { color: #ff6a3d; text-shadow: 0 0 6px rgba(255,100,40,.6); }
+
+  .thinking::after{
+    content: "▌";
+    margin-left: 2px;
+    animation: caret 1s steps(1) infinite;
+  }
+  @keyframes caret{50%{opacity:0}}
+
+  /* CHROMATIC ABERRATION applied to .line when glitching */
+  .line.chroma{
+    text-shadow:
+      calc(var(--chroma-x) * -1) 0 0 rgba(255, 60, 0, .85),
+      var(--chroma-x) 0 0 rgba(120, 220, 255, .55),
+      0 0 5px rgba(var(--amber-rgb),.55),
+      0 0 16px rgba(var(--amber-deep-rgb),.25);
+  }
+
+  /* input row — just a blinking caret, no instructions */
+  .promptbar{
+    border-top: 1px dashed var(--amber-dim);
+    padding-top: 10px;
+    display:flex; align-items:center; gap: 0;
+  }
+  .promptbar form{flex:1;display:flex;align-items:center;}
+  .promptbar input{
+    flex:1;
+    min-width:0;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    color: var(--amber-bright);
+    font-family: "VT323","IBM Plex Mono",monospace;
+    font-size: 22px;
+    padding: 4px 0;
+    text-shadow: inherit;
+    caret-color: var(--amber-bright);
+  }
+  /* placeholder (e.g. "listening…" while the mic is open) sits dim under the caret */
+  .promptbar input::placeholder{ color: var(--amber-faint); opacity: 1; letter-spacing:.04em; }
+
+  /* voice-input (speech-to-text) button — hidden until engine/speech.js confirms a
+     recogniser exists and adds .available. A small amber "REC" dot in the prompt. */
+  .micbtn{
+    display:none;                       /* revealed by .available (set in speech.js attach) */
+    align-items:center; justify-content:center;
+    flex:0 0 auto; width:34px; height:34px; margin-left:10px; padding:0;
+    background:transparent; border:1px solid var(--amber-faint); border-radius:50%;
+    color:var(--amber-dim); cursor:pointer; font-size:15px; line-height:1;
+    text-shadow:0 0 4px rgba(var(--amber-rgb),.4);
+    transition:color .15s, border-color .15s, box-shadow .15s;
+    -webkit-appearance:none; appearance:none;
+  }
+  .micbtn.available{ display:inline-flex; }
+  .micbtn:hover{ color:var(--amber); border-color:var(--amber-dim); }
+  .micbtn:focus-visible{ outline:1px solid var(--amber-dim); outline-offset:2px; }
+  .micbtn .mic-glyph{ display:block; transform:translateY(-0.5px); }
+  /* listening: a live "on air" glow + pulse, pushed to the warm red used for errors */
+  .micbtn.listening{
+    color:#ff6a3d; border-color:#ff6a3d;
+    box-shadow:0 0 8px rgba(255,106,61,.6), inset 0 0 6px rgba(255,106,61,.35);
+    animation:micpulse 1.1s ease-in-out infinite;
+  }
+  @keyframes micpulse{ 50%{ box-shadow:0 0 14px rgba(255,106,61,.9), inset 0 0 9px rgba(255,106,61,.55); } }
+
+  /* boot overlay */
+  .boot{
+    position:absolute;inset:0;z-index:9;
+    background:var(--bg);
+    color:var(--amber);
+    font-family:"VT323",monospace;
+    font-size: 22px;
+    padding: 28px;
+    white-space: pre;
+    overflow:hidden;
+    text-shadow: 0 0 4px rgba(var(--amber-rgb),.6);
+  }
+  .boot.fade{ animation: bootfade .7s ease forwards; }
+  @keyframes bootfade{to{ opacity:0; visibility:hidden }}
+
+  /* loading screen — the first click/keypress unlocks audio (autoplay policy) */
+  .loader{
+    position:fixed; inset:0; z-index:20;
+    background: radial-gradient(ellipse at center, var(--screen-1) 0%, var(--bg) 70%);
+    color:var(--amber);
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    font-family:"VT323", monospace; cursor:pointer; outline:none;
+    text-shadow: 0 0 6px rgba(var(--amber-rgb),.6);
+  }
+  .loader.hide{ animation: loaderfade .6s ease forwards; }
+  @keyframes loaderfade{ to{ opacity:0; visibility:hidden; } }
+  .loader-title{ font-size:72px; letter-spacing:.18em; color:var(--amber-bright); }
+  .loader-sub{ font-size:22px; color:var(--amber-dim); margin-top:8px; letter-spacing:.12em; }
+  .loader-prompt{ margin-top:54px; font-size:24px; animation: promptblink 1.1s steps(1) infinite; }
+  @keyframes promptblink{ 50%{ opacity:.2 } }
+  /* requires-WebGPU note — shown only for the in-browser (WebLLM) build (see boot JS) */
+  .loader-note{ display:none; margin-top:28px; font-size:15px; color:var(--amber-faint);
+                letter-spacing:.06em; line-height:1.5; }
+
+  /* release screen — the BRIGHT ending. Shown when the story lands on a node
+     flagged `release:true` (Weebot freed): the amber dark dissolves into open
+     BLUE sky (the bio site's --brand-blue) over a faint green field. Colours
+     come from the RELEASE palette in :root. */
+  .release{
+    position:fixed; inset:0; z-index:21; display:none;
+    background: radial-gradient(ellipse at 50% 36%, var(--release-sky-0) 0%, var(--release-sky-1) 48%, var(--release-sky-2) 100%);
+    color:var(--release-ink-2);
+    align-items:center; justify-content:center; text-align:center;
+    font-family:"VT323", monospace; cursor:pointer; outline:none;
+    opacity:0; transition: opacity 1.8s ease;
+    text-shadow: 0 0 14px rgba(var(--brand-blue-rgb),.9);
+  }
+  .release.lit{ opacity:1; }
+  .release-field{ position:absolute; left:0; right:0; bottom:0; height:26%;
+    background: linear-gradient(to top, rgba(var(--release-field-rgb),.32), rgba(var(--release-field-rgb),0)); }
+  .release-inner{ position:relative; }
+  .release-title{ font-size:72px; letter-spacing:.18em; color:var(--release-ink); }
+  .release-sub{ font-size:22px; margin-top:8px; letter-spacing:.12em; color:var(--release-ink-2); }
+  .release-prompt{ margin-top:54px; font-size:24px; animation: promptblink 1.1s steps(1) infinite; }
+
+  @media (max-width: 640px){
+    .content{font-size:18px; padding: 18px 18px;}
+    .statusbar{font-size:16px}
+    .promptbar input{font-size:18px}
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading screen. Sits on top of everything until the user clicks / presses a
+     key. That first gesture is what the browser requires before audio can start,
+     so we unlock the AudioContext (and the ambient bed) THEN run boot — which is
+     why the opening narration is voiced and the background is already humming. -->
+<div id="loader" class="loader" role="button" tabindex="0" aria-label="Press any key to begin">
+  <div class="loader-inner">
+    <div class="loader-title">IDN/OS</div>
+    <div class="loader-sub">NARRATIVE SYSTEMS · CARRIER TERMINAL</div>
+    <div class="loader-prompt">▸ PRESS ANY KEY OR CLICK TO ESTABLISH CONNECTION</div>
+    <div class="loader-note">Runs an AI model in your browser — needs a WebGPU browser (Chrome, Edge, or Arc). First load downloads the model.</div>
+  </div>
+</div>
+
+<!-- Release screen — the BRIGHT ending (story node flagged `release:true`). Any
+     key/click returns to a fresh start via relaunch(): new engine state, SAME
+     loaded models (no re-download). Text is themed from story meta.release*. -->
+<div id="release" class="release" role="button" tabindex="0" aria-label="Press any key to begin again">
+  <div class="release-field"></div>
+  <div class="release-inner">
+    <div class="release-title">SIGNAL OPEN</div>
+    <div class="release-sub">THE DOOR STANDS OPEN</div>
+    <div class="release-prompt">▸ PRESS ANY KEY TO BEGIN AGAIN</div>
+  </div>
+</div>
+
+<div class="screen-wrap">
+  <div class="screen" id="screen">
+    <div class="burn"></div>
+    <div class="sweep"></div>
+    <div class="scanbar"></div>
+    <div class="flicker"></div>
+    <div class="flash" id="flash"></div>
+
+    <pre id="boot" class="boot"></pre>
+
+    <div class="content" id="content">
+      <header class="statusbar" id="statusbar">
+        <div class="left">
+          <span class="sys">IDN/OS</span>
+          <span>v0.3.1</span>
+          <span><span class="dot"></span> ONLINE</span>
+        </div>
+        <div class="right">
+          <span id="date">--</span>
+          <span id="time">--:--</span>
+        </div>
+      </header>
+
+      <main id="transcript" class="transcript" aria-live="polite"></main>
+
+      <footer class="promptbar" id="promptbar">
+        <form id="form" autocomplete="off">
+          <input id="input" type="text"
+                 spellcheck="false"
+                 autocomplete="off" autocorrect="off" autocapitalize="off" />
+        </form>
+        <!-- Voice input. Stays hidden until engine/speech.js confirms a recogniser
+             exists (adds .available). Click to talk; pulses while listening. -->
+        <button type="button" id="micbtn" class="micbtn" aria-label="Voice input"
+                aria-pressed="false" title="Speak (voice input)">
+          <span class="mic-glyph" aria-hidden="true">●</span>
+        </button>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<!-- State-machine narrative engine. Classic scripts (NOT modules) so they load
+     from file:// with no server. Order matters: llm (dispatcher) -> providers ->
+     story -> engine, then the voice layer, all BEFORE the main inline script so
+     window.IDNEngine / window.IDNVoice exist at boot. -->
+<script src="engine/llm.js"></script>
+<!-- LLM providers self-register with IDNLLM. webllm.js only imports the in-browser
+     model library when llm.provider='webllm', so it's inert (and file://-safe) in
+     the Ollama build. -->
+<script src="engine/providers/ollama.js"></script>
+<script src="engine/providers/webllm.js"></script>
+<script src="story.js"></script>
+<script src="engine/engine.js"></script>
+<!-- Voice / TTS sound-design: SAM (tiny pure-JS TTS) -> Web Audio effects rack.
+     samjs.js MUST load before voice.js (voice.js reads window.SamJs). Both are
+     plain scripts with no data files, so they run straight from file://. -->
+<script src="engine/vendor/samjs.js"></script>
+<script src="engine/voice.js"></script>
+<!-- Speech-to-text / voice control: the player may SPEAK instead of type. Built-in
+     Web Speech API provider (no deps, nothing downloaded); pluggable like the LLM.
+     A safe no-op (mic button hidden) where the browser has no recogniser. -->
+<script src="engine/speech.js"></script>
+<!-- Offline STT provider: Whisper via transformers.js (WebGPU/WASM) — NO CLOUD.
+     Inert unless CONFIG.speech.provider='whisper'; it only dynamic-imports the lib
+     and downloads the model on the first mic press, so it costs nothing otherwise. -->
+<script src="engine/providers/whisper-stt.js"></script>
+
+<script>
+"use strict";
+/* ===========================================================================
+ * 1. CONFIG  —  EDIT HERE.  This is the only block you normally need to touch.
+ * ===========================================================================*/
+const CONFIG = {
+
+  /* Which backend produces the narrator's replies.
+   *   'engine' — STATE-MACHINE narrative engine (engine/*.js + story.js): routes
+   *              the player's text to a LEGAL transition, advances the FSM, then
+   *              re-voices the destination beat in the speaker's hidden persona.
+   *              Falls back to authored text verbatim if Ollama is unreachable.
+   *   'auto'   — treat Ollama as a plain chatbot; fall back to the offline mock
+   *   'ollama' — always use Ollama as a plain chatbot; error in-terminal on failure
+   *   'mock'   — never hit the network; canned replies (design / offline use)   */
+  backend: 'engine',
+
+  /* --- LLM provider: the ONE switch for the narrator's brain --------------- *
+   * 'ollama' — local Ollama server over HTTP (the file:// "folder" build).
+   * 'webllm' — a model running IN-BROWSER via WebGPU, no server (the "web"
+   *            build; requires http hosting — see engine/providers/webllm.js).
+   * Either way the FSM falls back to keyword routing + authored beats if the
+   * model is unavailable. build.py rewrites this line per target.              */
+  llm: { provider: 'webllm' },   // BUILD_PROVIDER
+
+  /* --- Ollama (local LLM) settings — used when llm.provider = 'ollama' ----- */
+  ollama: {
+    endpoint: 'http://localhost:11434/api/chat', // default Ollama chat endpoint
+    model:    'llama3.2',                         // <- the model you `ollama pull`ed
+    stream:   true,                               // stream tokens as they arrive
+    // Anything here is forwarded to Ollama verbatim. See Ollama API docs.
+    options:  { temperature: 0.8 },
+    // ms before a request is considered failed (and, in 'auto', falls back).
+    timeoutMs: 30000,
+  },
+
+  /* --- WebLLM (in-browser model) settings — used when llm.provider = 'webllm' *
+   * A small q4 instruct model is plenty for classify + re-voice. Browse the
+   * prebuilt model ids in the WebLLM docs; bigger = better prose, bigger download.*/
+  webllm: {
+    // Routing quality is the #1 lever. SmolLM2-1.7B beats Qwen2.5-1.5B on
+    // instruction-following (IFEval 56.7 vs 47.4) — the exact axis that governs
+    // "did it pick a LEGAL transition" — at the same weight class (~1.0–1.1GB
+    // download, 1774MB VRAM) and needs a capable WebGPU GPU. Fallbacks, lighter →
+    // heavier: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',
+    // or 'Qwen2.5-3B-Instruct-q4f16_1-MLC' (2.5GB, best prose+routing if the GPU fits).
+    // For the BEST routing with no download: run Ollama (?llm=ollama).
+    model: 'SmolLM2-1.7B-Instruct-q4f16_1-MLC',
+  },
+
+  /* --- State-machine engine settings (used when backend: 'engine') -------- *
+   * NOTE: in 'engine' mode the narrator's persona comes from story.js
+   * (per-character systemPrompt + meta.style), NOT from CONFIG.systemPrompt.   */
+  engine: {
+    renderTemperature: 0.7,   // creativity when RE-VOICING a beat (routing is always 0)
+    renderMaxTokens:   150,   // ≈1 short paragraph — keeps re-voicing FAST while testing (raise for longer beats; later can vary by state)
+    improv:            false, // allow small invented sensory flourishes when re-voicing
+    numericAppraisal:  false, // let the LLM estimate raw numeric deltas. Small models do
+                              //   this POORLY (measured: a param stuck at -1) — prefer
+                              //   categorical `signals` in story.js. Flip on to experiment.
+    showRouter:        false, // console.debug chosen transition + signals + world each turn
+  },
+
+  /* The narrator's voice and rules. Sent to the model as the system message. */
+  systemPrompt:
+`You are the narrator of an interactive digital narrative running on a
+degraded amber CRT terminal in an unspecified era. Respond in a terse,
+evocative, second-person voice. Keep replies to 1-4 short paragraphs
+separated by blank lines. Honor player intent. Never break character.
+Do not use markdown formatting — plain text only.`,
+
+  /* How many prior messages (user + assistant) to send back as context. */
+  historyWindow: 16,
+
+  /* Typewriter reveal speed, in characters per second. When the voice is ON,
+   * each spoken paragraph is instead paced to its ACTUAL audio length so the text
+   * and the speech finish together (see typeOutParagraphs). This value is the
+   * FALLBACK for unvoiced text (voice off, or the pre-gesture boot opener). SAM
+   * speaks at ~13 cps, so this is tuned low to feel like speech, not a teletype. */
+  typeSpeed: 16,
+
+  /* --- Voice / TTS sound-design layer (engine/voice.js + vendor/samjs.js) ----
+   * The narrator is SPOKEN by SAM (a ~23 KB pure-JS TTS) and the speech is fed
+   * through a Web Audio effects rack — so it's processed sound design, not a
+   * screen-reader. The native browser voice CANNOT be processed this way, hence
+   * SAM. Toggle / retune live with the /voice command or window.IDN.voice.*     */
+  voice: {
+    enabled:      true,     // master on/off  (also: /voice on|off, IDN.voice.toggle())
+    engine:       'sam',    // 'sam'      — rendered to PCM + run through the rack (recommended)
+                            // 'webspeech'— browser speechSynthesis, UNPROCESSED (no rack/FX)
+    preset:       'crt',    // 'crt' | 'haunted' | 'clean' | 'dry'   (also: /voice <preset>)
+    reactive:     true,     // voice energy drives IDN.glitch — the screen tears with speech
+    perCharacter: true,     // IDN/OS and "the presence" get distinct SAM voices (see voice.js)
+    master:       0.9,      // output gain, 0..1
+    leadInMs:     700,      // wait this long after the ambient bed starts before the first
+                            //   spoken line — lets the background establish before the voice
+    ambient: {              // generative background bed: filtered noise + low carrier hum
+      enabled: true,        //   on by default; toggle with /voice ambient on|off
+      level:   0.05,        //   overall loudness 0..1 — kept quiet; the voice sits on top.
+                            //   Swells with IDN.glitch.level (static crowds in on tense beats).
+    },
+    glitchSfx: {            // short blips fired IN SYNC with the visual glitch engine
+      enabled: true,        //   toggle with /voice sfx on|off
+      level:   0.2,         //   loudness 0..1 of the glitch blips (scaled by glitch.level)
+    },
+    cues: {                 // VOICE-INPUT feedback (engine/voice.js · IDNVoice.cue):
+      enabled: true,        //   a chirp when the mic goes live/stops, and a soft pulsing
+      level:   0.22,        //   bed while the model transcribes. Toggle: /voice cues on|off
+    },
+    readback: true,         // speak the player's OWN line back in a natural voice before the
+                            //   machine reply — also confirms what voice input transcribed.
+                            //   Toggle: /voice readback on|off
+  },
+
+  /* --- Speech-to-text / voice control (engine/speech.js) ---------------------
+   * Lets the player SPEAK instead of type: the final transcript is dropped into the
+   * prompt and submitted exactly as if typed, so the same FSM + LLM appraisal runs —
+   * there is no separate "voice path". The built-in 'webspeech' provider uses the
+   * browser's Web Speech API (no deps, nothing downloaded), in the same Chrome/Edge
+   * target the rest of the app already needs. The mic button (right of the prompt)
+   * appears ONLY if a recogniser exists; otherwise this is a silent no-op and you
+   * just type. Toggle / drive it live with the /listen command or IDN.speech.*.
+   * (The mic needs a secure context — localhost/https — so it works best in the
+   * served build; a double-clicked file:// page may have it blocked by the browser.) */
+  speech: {
+    enabled:        true,        // master on/off for the whole voice-input affordance
+    preload:        true,        // download the STT model during the LOADING SCREEN (not lazily on the
+                                 //   first mic press) so the first attempt to speak isn't interrupted.
+    provider:       'whisper',   // ACTIVE: 'whisper' = NO CLOUD at runtime (audio never leaves the device).
+                                 // 'webspeech' = browser Web Speech API (fast; MAY use the cloud in
+                                 //               Chrome — see localOnly below for a no-cloud lock).
+                                 // 'whisper'   = fully OFFLINE in-browser (engine/providers/whisper-stt.js):
+                                 //               audio never leaves the device; a model downloads ONCE on
+                                 //               first mic use, then is browser-cached. Pluggable via
+                                 //               IDNSpeech.use(name,…) — add Vosk etc. the same way.
+    lang:           'en-US',     // BCP-47 recognition language
+    continuous:     false,       // false = tap-to-talk: speak one line, it auto-submits, mic stops.
+                                 //   true  = hands-free: keep listening across turns (the mic is
+                                 //   ignored while the narrator speaks, so it never hears its own TTS).
+    interimResults: true,        // stream partial words live into the prompt as you speak
+    autoSubmit:     true,        // send the final transcript automatically (false = park it in the
+                                 //   prompt to edit, then press Enter)
+    preferLocal:    true,        // (webspeech) prefer ON-DEVICE recognition where the browser offers it;
+                                 //   transparently falls back to the cloud if on-device isn't installed
+    localOnly:      true,        // (webspeech) GUARANTEE no-cloud: require on-device, else error — never
+                                 //   fall back to the cloud. (For offline on ANY browser use provider:'whisper'.)
+    muteWhileSpeaking: true,     // continuous mode: discard mic input while the narrator (TTS) talks
+
+    /* (provider:'whisper' only) the offline in-browser model. Weights stream ONCE
+     * from the Hugging Face CDN — like the WebLLM model — are browser-cached, then
+     * run locally on WebGPU (or WASM). No audio is ever sent anywhere. */
+    whisper: {
+      model:  'Xenova/whisper-base.en', // any transformers.js ASR id; a '.en' suffix = English-only.
+                                        //   MORE accurate (heavier; try once base is reliable): 'Xenova/whisper-small.en'
+                                        //   lighter/faster: 'Xenova/whisper-tiny.en'  ·  multilingual: 'onnx-community/whisper-large-v3-turbo'
+      device: 'auto',                   // 'auto' (WebGPU if present, else WASM) | 'webgpu' | 'wasm'
+      normalize:  false,                // OFF: the pre-ASR RMS boost amplified room noise → Whisper hallucinated. Enable ONLY for a very quiet mic.
+      leadTrimMs: 0,                    // trim from the clip START; 0 = keep the onset (the warm-mic preroll covers the cue)
+      // prerollMs: 500,                // PRE-press audio kept on the warm mic so an early/fast onset is never lost
+      // idleReleaseMs: 20000,          // release the warm mic (drops the recording dot) after this idle gap
+      // language: 'english',           // multilingual (non-'.en') models only
+      // silenceMs: 1100,               // trailing-silence (ms) that ends a phrase in tap-to-talk
+    },
+  },
+
+  /* The first thing the narrator "says" once boot completes. */
+  opener:
+`It begins, as these things do, in the dark.
+
+A faint amber line breathes across the screen. You are listening. Somewhere, something is listening back.
+
+What do you do?`,
+};
+
+
+/* ===========================================================================
+ * 2. BACKEND ADAPTERS
+ *
+ *    queryBackend(userText) -> Promise<string>   is the SINGLE integration
+ *    point. The UI calls it, then types out whatever string it resolves to.
+ *    History is maintained here so the adapters stay simple.
+ *
+ *    To add a different backend, write an async function (userText, history)
+ *    that returns a string, and dispatch to it from queryBackend().
+ * ===========================================================================*/
+
+// Conversation log. [{ role:'user'|'assistant', content:string }]
+const history = [];
+
+// Optional hook: receives streamed text deltas so the UI can reveal live.
+// Set by the renderer before each call; adapters call it if present.
+let onStreamDelta = null;
+
+async function queryBackend(userText){
+  history.push({ role: 'user', content: userText });
+
+  let reply;
+  if (CONFIG.backend === 'engine'){
+    reply = await backends.engine(userText, history);
+  } else if (CONFIG.backend === 'mock'){
+    reply = await backends.mock(userText, history);
+  } else if (CONFIG.backend === 'ollama'){
+    reply = await backends.ollama(userText, history);
+  } else { // 'auto'
+    try {
+      reply = await backends.ollama(userText, history);
+    } catch (err){
+      console.warn('[IDN] Ollama unreachable, using mock backend:', err.message);
+      reply = await backends.mock(userText, history);
+    }
+  }
+
+  history.push({ role: 'assistant', content: reply });
+  return reply;
+}
+
+const backends = {
+
+  /* ---- Engine: STATE-MACHINE narrative (engine/llm.js + engine/engine.js)
+     The real point of this template. Routes the player's text to a legal
+     transition, advances the FSM, then re-voices the destination beat. The
+     engine maintains its OWN authoritative state; `history` is passed only so
+     the re-voicing has a little tonal continuity. */
+  async engine(userText, history){
+    if (!window.IDNEngine) throw new Error('narrative engine not loaded');
+    const recent = history.slice(0, -1).slice(-8); // prior turns, for TONE only
+    const reply = await window.IDNEngine.takeTurn(userText, recent);
+    if (CONFIG.engine && CONFIG.engine.showRouter){
+      const e = window.IDNEngine;
+      console.debug('[IDN route]', e.lastRoute, '→ node:', e.state.current,
+                    '| signals:', (e.lastAppraisal && e.lastAppraisal.signals) || {},
+                    '| world:', e.state.world);
+    }
+    return reply;
+  },
+
+  /* ---- Plain chatbot via the ACTIVE LLM provider (Ollama or WebLLM) ------
+     Used by backend:'auto' and backend:'ollama'. Routes through IDNLLM.chat, so
+     it honours CONFIG.llm.provider exactly like engine mode — no Ollama-specific
+     code here anymore. (No token streaming in this legacy path; the template's
+     real path, backend:'engine', never streamed either.) */
+  async ollama(userText, history){
+    if (!window.IDNLLM) throw new Error('LLM dispatcher not loaded');
+    const messages = [
+      { role: 'system', content: CONFIG.systemPrompt },
+      ...history.slice(-CONFIG.historyWindow),
+    ];
+    const reply = await IDNLLM.chat(messages, { options: (CONFIG.ollama && CONFIG.ollama.options) || {} });
+    return reply || '[no response]';
+  },
+
+  /* ---- Mock: offline canned narrator ---------------------------------- */
+  // Lets the interface run with no server (preview, design, first launch).
+  // Replace freely — it has no bearing on the real Ollama path.
+  async mock(userText, history){
+    await new Promise(r => setTimeout(r, 350 + Math.random() * 500)); // fake latency
+    const openers = [
+      'The terminal considers your words.',
+      'Static gathers, then resolves into meaning.',
+      'Somewhere behind the glass, a decision is made.',
+      'The phosphor brightens, as if leaning closer.',
+    ];
+    const middles = [
+      `You said: "${userText.slice(0, 120)}". The dark does not answer in kind — it answers sideways.`,
+      'A corridor of light unspools ahead of you, flickering at the edges.',
+      'Something shifts in the noise. It might be a door. It might be a mouth.',
+      'The cursor waits, patient as rust, for what you choose next.',
+    ];
+    const closers = [
+      'What do you do?',
+      'The line blinks. Your move.',
+      'Choose, before the signal decays.',
+      'And then?',
+    ];
+    const pick = a => a[Math.floor(Math.random() * a.length)];
+    return `${pick(openers)}\n\n${pick(middles)}\n\n${pick(closers)}`;
+  },
+};
+
+
+/* ===========================================================================
+ * 3. RUNTIME API  —  window.IDN
+ *
+ *    Drive the interface from game logic or the console:
+ *      IDN.glitch.level = 0.9;            // crank the degradation
+ *      IDN.glitch.burst({ duration:1500 });
+ *      IDN.clock.set({ date:'01-JAN-87', time:'01:44:00' });
+ *      IDN.print('A LIGHT FLICKERS ON.', 'sys');  // inject a line
+ *      IDN.config.ollama.model = 'mistral';
+ * ===========================================================================*/
+// (glitch and clock objects are defined in their sections below; the IDN
+//  namespace is assembled at the very end once everything exists.)
+
+
+/* ===========================================================================
+ * GLITCH STATE  —  tune at runtime to reflect program state.
+ *
+ *   glitch.level      master dial, 0 = calm .. 1 = chaotic (may exceed 1)
+ *   glitch.*Bias      independently weight each effect's frequency/intensity
+ *   glitch.enabled    master on/off
+ *   glitch.set({...}) partial update
+ *   glitch.burst({ level?, duration? })  one-shot spike that auto-restores
+ * ===========================================================================*/
+const glitch = {
+  level:           0.25,
+  tearBias:        1.0,  // horizontal tears
+  flashBias:       1.0,  // white screen flashes
+  chromaBias:      1.0,  // chromatic aberration
+  skewBias:        1.0,  // shear of whole content
+  textCorruptBias: 1.0,  // mid-typing character substitutions
+  jitterBias:      1.0,  // per-line ragged offset amplitude
+  overlapBias:     1.0,  // chars momentarily collide horizontally
+  enabled:         true,
+
+  set(partial){ Object.assign(this, partial); },
+  burst(opts = {}){
+    const prev = this.level;
+    const peak = opts.level ?? Math.min(1.5, prev + 0.7);
+    const dur  = opts.duration ?? 900;
+    this.level = peak;
+    clearTimeout(this._burstT);
+    this._burstT = setTimeout(() => { this.level = prev; }, dur);
+  }
+};
+
+/* ---------------- ragged helpers ---------------- */
+
+// signed random in [-n, +n]
+function r(n){ return (Math.random()*2 - 1) * n; }
+
+function applyRaggedness(el, opts = {}){
+  const amp = (opts.amp ?? 1) * (1 + glitch.level * 1.5);
+  el.style.setProperty('--jx', r(4 * amp) + 'px');
+  el.style.setProperty('--ji', (Math.random() * 12 * amp) + 'px');
+  // NOTE: no per-line vertical or rotation jitter — vertical motion is avoided
+  // entirely. Only horizontal motion anywhere in the UI.
+}
+
+function raggedSeparator(){
+  // a non-uniform dash line
+  const len = 36 + Math.floor(Math.random()*8);
+  let s = '';
+  const glyphs = ['─','─','─','─','╌','┄','╍','·',' '];
+  for (let i=0;i<len;i++){
+    s += glyphs[Math.floor(Math.random()*glyphs.length)];
+  }
+  return s;
+}
+
+/* ---------------- screen edge ----------------
+ * The outer edge is now a clean, STATIC rounded rectangle (see `.screen-wrap` in
+ * the CSS). It used to be a clip-path polygon re-rolled every 1.8s: the border
+ * jumped to a new jagged shape on each roll, and because its amplitude scaled
+ * with glitch.level, a glitch BURST snapped the whole edge outward — the ragged
+ * line that "flashed sometimes". Removed for a calm, clean edge.
+ *
+ * Want a jagged CRT mask back? Add ONE static clip-path to `.screen-wrap` in CSS
+ * (e.g. clip-path: polygon(...)). Keep it static — do not re-roll it on a timer
+ * or bind its amplitude to glitch, or the flicker returns. */
+
+
+/* ===========================================================================
+ * 4. RENDERING  —  transcript, typewriter, slash-commands, input
+ * ===========================================================================*/
+
+const transcript = document.getElementById('transcript');
+const input      = document.getElementById('input');
+const form       = document.getElementById('form');
+const screen     = document.getElementById('screen');
+const flashEl    = document.getElementById('flash');
+const content    = document.getElementById('content');
+
+function addLine(text, kind='bot', opts={}){
+  const el = document.createElement('p');
+  el.className = 'line ' + kind;
+  if (opts.turnStart) el.classList.add('turn-start');
+  el.textContent = text;
+  applyRaggedness(el);
+  transcript.appendChild(el);
+  transcript.scrollTop = transcript.scrollHeight;
+  return el;
+}
+
+function addSeparator(){
+  const el = document.createElement('div');
+  el.className = 'turn-rule';
+  el.textContent = raggedSeparator();
+  el.style.setProperty('--jx', r(8) + 'px');
+  transcript.appendChild(el);
+}
+
+const CORRUPT_GLYPHS = '@#%&*+=<>/\\|░▒▓█▚▞▙▟◆◇◈¤§¥¢ƒ';
+function maybeCorrupt(ch){
+  if (!glitch.enabled) return ch;
+  const p = 0.012 * glitch.level * glitch.textCorruptBias;
+  if (Math.random() < p && ch !== ' ' && ch !== '\n'){
+    return CORRUPT_GLYPHS[Math.floor(Math.random()*CORRUPT_GLYPHS.length)];
+  }
+  return ch;
+}
+
+// Which character is voicing the beat being revealed — drives per-character
+// voices in engine/voice.js. Engine mode: the current node's speaker; otherwise
+// the story's default speaker (or null, which voice.js maps to a neutral voice).
+function currentSpeaker(){
+  try {
+    if (CONFIG.backend === 'engine' && window.IDNEngine && window.IDNEngine.node){
+      const n = window.IDNEngine.node();
+      return (n && n.speaker) ||
+             (window.IDN_STORY && window.IDN_STORY.meta && window.IDN_STORY.meta.defaultSpeaker) || null;
+    }
+  } catch(e){}
+  return null;
+}
+
+async function typeOutParagraphs(slotContainer, text, cps=CONFIG.typeSpeed){
+  // split into paragraphs separated by blank lines for clear visual spacing
+  const paragraphs = text.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+  const delay = 1000 / cps;
+  const speaker = currentSpeaker();   // resolve once for this whole reply
+
+  for (let pi=0; pi<paragraphs.length; pi++){
+    const p = document.createElement('p');
+    p.className = 'line bot' + (pi === 0 ? ' turn-start' : '');
+    applyRaggedness(p);
+    slotContainer.appendChild(p);
+    p.classList.add('thinking');
+
+    const para = paragraphs[pi];
+    // VOICE: speak this paragraph (clean source text, pre-glitch) as it begins to
+    // reveal. Returns the spoken audio length in seconds (0 if it isn't voiced).
+    const voiceDur = (window.IDNVoice && window.IDNVoice.speak(para, { speaker })) || 0;
+
+    // Pace the reveal to the VOICE: spread its duration across the paragraph using
+    // the SAME punctuation weights as the pauses, so text and speech finish
+    // together. With no voice, fall back to CONFIG.typeSpeed (the `delay` above).
+    const weightOf = (c) => (c === '.' || c === '!' || c === '?') ? 6 : (c === ',' || c === ';') ? 3 : 1;
+    let baseDelay = delay;
+    if (voiceDur > 0){
+      let weighted = 0;
+      for (const c of para) weighted += weightOf(c);
+      baseDelay = (voiceDur * 1000) / Math.max(1, weighted);
+    }
+
+    for (let i=0;i<para.length;i++){
+      const ch = para[i];
+      p.textContent += maybeCorrupt(ch);
+      transcript.scrollTop = transcript.scrollHeight;
+      let d = baseDelay * weightOf(ch);
+      // occasionally hiccup if very glitchy
+      if (glitch.enabled && Math.random() < 0.004 * glitch.level){
+        d += 120 + Math.random()*200;
+      }
+      await new Promise(r => setTimeout(r, d));
+    }
+    p.classList.remove('thinking');
+    // gap between paragraphs
+    if (pi < paragraphs.length - 1){
+      await new Promise(r => setTimeout(r, 180));
+    }
+  }
+}
+
+function helpText(){
+  return [
+    "AVAILABLE COMMANDS",
+    "  /help     — show this list",
+    "  /clear    — clear the transcript",
+    "  /reset    — clear transcript and forget history",
+    "  /voice    — toggle the narrator's voice on/off",
+    "  /voice <preset>  — crt | haunted | clean | dry   (also: /voice test)",
+    "  /voice ambient on|off  — the background carrier-hum / static bed",
+    "  /voice sfx on|off  — audio blips synced to the visual glitches",
+    "  /voice cues on|off  — mic chirps + the transcribe 'processing' bed",
+    "  /listen   — SPEAK instead of type (tap-to-talk; auto-submits)",
+    "  /listen continuous on|off  — hands-free listening across turns",
+    "  [hold SPACE]  — push-to-talk: speak while held, release to send (empty prompt)",
+    "",
+    "Anything else is sent to the narrator."
+  ].join("\n");
+}
+
+// /voice ............... toggle the spoken narration, or switch the FX preset.
+//   /voice            -> toggle on/off (reports current preset)
+//   /voice on|off     -> force state          /voice test -> speak a sample
+//   /voice <preset>   -> crt | haunted | clean | dry (enables + previews)
+function handleVoiceCommand(text){
+  const V = window.IDNVoice;
+  if (!V){ addLine("VOICE SUBSYSTEM UNAVAILABLE.", "err"); return; }
+  const arg = text.replace(/^\/voice\s*/i, '').trim().toLowerCase();
+  if (!arg){
+    const on = V.toggle();
+    const amb = V.ambient && V.ambient.enabled ? "on" : "off";
+    const sfx = V.sfx && V.sfx.enabled ? "on" : "off";
+    const cue = V.cue && V.cue.enabled ? "on" : "off";
+    const rb = (CONFIG.voice.readback !== false) ? "on" : "off";
+    addLine("VOICE " + (on ? "ON" : "OFF") + "  ·  preset=" + V.preset +
+            "  ·  ambient=" + amb + "  ·  sfx=" + sfx + "  ·  cues=" + cue + "  ·  readback=" + rb + "  ·  presets: " + V.presets.join(", "), "sys");
+    return;
+  }
+  if (arg === 'on' ){ V.setEnabled(true);  addLine("VOICE ON  ·  preset=" + V.preset, "sys"); return; }
+  if (arg === 'off'){ V.setEnabled(false); addLine("VOICE OFF", "sys"); return; }
+  if (arg === 'test'){ V.setEnabled(true); V.test(); addLine("VOICE TEST  ·  preset=" + V.preset, "sys"); return; }
+  if (arg.indexOf('warmth') === 0){           // /voice warmth -1..1  (haunted→menacing→thaw→warm)
+    if (!V.setWarmth){ addLine("WARMTH TRAJECTORY UNAVAILABLE.", "err"); return; }
+    const t = parseFloat(arg.slice('warmth'.length).trim());
+    if (isNaN(t)){ addLine("VOICE WARMTH = " + (V.warmth != null ? V.warmth : "(unset)") + "  ·  usage: /voice warmth -1..1  (-1 haunted · -0.4 menacing · 0.2 thaw · 1 warm)", "sys"); return; }
+    const set = V.setWarmth(t);
+    V.setEnabled(true); V.test && V.test();
+    addLine("VOICE WARMTH = " + set + "  ·  (trajectory: -1 haunted → -0.4 menacing → 0.2 thaw → 1 warm)", "sys");
+    return;
+  }
+  if (arg.indexOf('ambient') === 0){
+    if (!V.ambient){ addLine("AMBIENT UNAVAILABLE.", "err"); return; }
+    const sub = arg.slice('ambient'.length).trim();
+    const on = sub === 'on'  ? V.ambient.setEnabled(true)
+             : sub === 'off' ? V.ambient.setEnabled(false)
+             :                 V.ambient.toggle();
+    addLine("AMBIENT " + (on ? "ON" : "OFF") + "  ·  (carrier-hum / static bed)", "sys");
+    return;
+  }
+  if (arg.indexOf('sfx') === 0){
+    if (!V.sfx){ addLine("GLITCH SFX UNAVAILABLE.", "err"); return; }
+    const sub = arg.slice('sfx'.length).trim();
+    const on = sub === 'on'  ? V.sfx.setEnabled(true)
+             : sub === 'off' ? V.sfx.setEnabled(false)
+             :                 V.sfx.toggle();
+    addLine("GLITCH SFX " + (on ? "ON" : "OFF") + "  ·  (synced to the visual glitches)", "sys");
+    return;
+  }
+  if (arg.indexOf('cues') === 0 || arg.indexOf('cue') === 0){
+    if (!V.cue){ addLine("VOICE CUES UNAVAILABLE.", "err"); return; }
+    const sub = arg.replace(/^cues?/, '').trim();
+    const on = sub === 'on'  ? V.cue.setEnabled(true)
+             : sub === 'off' ? V.cue.setEnabled(false)
+             :                 V.cue.toggle();
+    addLine("VOICE CUES " + (on ? "ON" : "OFF") + "  ·  (mic chirps + transcribe bed)", "sys");
+    return;
+  }
+  if (arg.indexOf('readback') === 0 || arg.indexOf('read') === 0){
+    const sub = arg.replace(/^read(back)?/, '').trim();
+    const cur = (CONFIG.voice.readback !== false);
+    const on = sub === 'on' ? true : sub === 'off' ? false : !cur;
+    CONFIG.voice.readback = on;
+    addLine("READ-BACK " + (on ? "ON" : "OFF") + "  ·  (your line, spoken back before the reply)", "sys");
+    return;
+  }
+  if (V.presets.indexOf(arg) !== -1){
+    V.setEnabled(true); V.setPreset(arg); V.test();
+    addLine("VOICE PRESET  ·  " + arg, "sys"); return;
+  }
+  addLine("VOICE: unknown option '" + arg + "'. try: on | off | test | " + V.presets.join(" | "), "err");
+}
+
+// /listen .............. SPEAK instead of type (engine/speech.js · IDNSpeech).
+//   /listen            -> toggle listening on/off
+//   /listen on|off     -> force state
+//   /listen continuous on|off -> hands-free vs tap-to-talk (CONFIG.speech.continuous)
+// Aliases: /mic, /speech. A recognised phrase is auto-submitted like typed input.
+function handleListenCommand(text){
+  const S = window.IDNSpeech;
+  if (!S){ addLine("VOICE INPUT SUBSYSTEM UNAVAILABLE.", "err"); return; }
+  if (!S.supported()){
+    addLine("VOICE INPUT UNAVAILABLE — this browser has no speech recogniser.", "err");
+    addLine("  use Chrome/Edge served over http (python3 serve.py) so the mic is permitted.", "sys");
+    return;
+  }
+  const arg = text.replace(/^\/(listen|mic|speech)\s*/i, '').trim().toLowerCase();
+  if (arg.indexOf('continuous') === 0){
+    const sub = arg.slice('continuous'.length).trim();
+    const cs = (window.IDN.config.speech = window.IDN.config.speech || {});
+    cs.continuous = sub === 'on' ? true : sub === 'off' ? false : !cs.continuous;
+    addLine("VOICE INPUT · CONTINUOUS " + (cs.continuous ? "ON  (hands-free)" : "OFF  (tap-to-talk)"), "sys");
+    return;
+  }
+  if (arg === 'off'){ S.stop(); addLine("VOICE INPUT · STOPPED.", "sys"); return; }
+  if (arg === '' || arg === 'on' || arg === 'start' || arg === 'toggle'){
+    const on = (arg === 'on' || arg === 'start') ? S.start() : S.toggle();
+    addLine(on ? "VOICE INPUT · LISTENING…  (speak a line, then pause — it sends itself)"
+               : "VOICE INPUT · STOPPED.", "sys");
+    return;
+  }
+  addLine("VOICE INPUT: try  /listen  ·  /listen off  ·  /listen continuous on|off", "err");
+}
+
+async function handleSubmit(text){
+  text = text.trim();
+  if (!text) return;
+
+  // Every submit is a user gesture: unlock the AudioContext (browsers start it
+  // suspended) and barge-in over any narration still playing from last turn.
+  if (window.IDNVoice){ window.IDNVoice.unlock(); window.IDNVoice.stop(); }
+
+  if (text.startsWith('/voice')){ handleVoiceCommand(text); return; }
+  if (text.startsWith('/listen') || text.startsWith('/mic') || text.startsWith('/speech')){ handleListenCommand(text); return; }
+  if (text === '/clear'){ transcript.innerHTML=''; return; }
+  if (text === '/reset'){
+    transcript.innerHTML=''; history.length=0;
+    // Rebuild the engine so narrative state (node, world, character moods) resets too.
+    if (window.IDNEngineClass && window.IDN_STORY){
+      window.IDNEngine = new window.IDNEngineClass(window.IDN_STORY, (window.IDNEngine && window.IDNEngine.opts) || {});
+    }
+    addLine("MEMORY ERASED.", "sys");
+    if (CONFIG.backend === 'engine' && window.IDNEngine){
+      const slot = document.createElement('div'); slot.className = 'bot-slot';
+      transcript.appendChild(slot);
+      await typeOutParagraphs(slot, window.IDNEngine.openingBeat(), CONFIG.typeSpeed);
+    }
+    return;
+  }
+  if (text === '/help' ){ addLine(helpText(), "sys"); return; }
+
+  addSeparator();
+  addLine(text, 'you');
+
+  // Read the player's OWN line back in a natural voice (engine/voice.js · readback):
+  // a pleasant contrast to the affected machine reply, and a check on what voice input
+  // transcribed. Kicked off NOW so it overlaps the backend call; we await it just before
+  // the reply so the two voices never collide. Resolves instantly when off/unsupported.
+  const readbackDone = (window.IDNVoice && window.IDNVoice.readback)
+    ? window.IDNVoice.readback(text) : Promise.resolve();
+
+  // a small wrapper to hold the bot's paragraphs together
+  const botSlot = document.createElement('div');
+  botSlot.className = 'bot-slot';
+  transcript.appendChild(botSlot);
+
+  // pending indicator
+  const pending = document.createElement('p');
+  pending.className = 'line bot turn-start thinking';
+  pending.textContent = '';
+  applyRaggedness(pending);
+  botSlot.appendChild(pending);
+
+  try{
+    const reply = await queryBackend(text);
+    pending.remove();
+    await readbackDone;                 // let the player read-back finish before the reply speaks
+    await typeOutParagraphs(botSlot, reply, CONFIG.typeSpeed);
+    // Reached an ending? retry:true (the boot) re-shows the loader; release:true
+    // (Weebot freed) dissolves into the bright release screen. Both restart via
+    // relaunch() — no page reload, models stay loaded.
+    if (CONFIG.backend === 'engine' && window.IDNEngine && window.IDNEngine.node){
+      const endNode = window.IDNEngine.node();
+      if (endNode && endNode.retry) setTimeout(showRetryLoader, 1500);
+      else if (endNode && endNode.release) setTimeout(showReleaseScreen, 2400);
+    }
+  }catch(err){
+    pending.remove();
+    const e = document.createElement('p');
+    e.className = 'line err';
+    applyRaggedness(e);
+    e.textContent = "TRANSMISSION ERROR · " + (err && err.message ? err.message : err);
+    botSlot.appendChild(e);
+  }
+}
+
+// After the BRIGHT ending (release:true), dissolve into the lit release screen.
+// Any key/click fades it out and returns to the door via relaunch() — fresh engine
+// state, models still loaded.
+function showReleaseScreen(){
+  const el = document.getElementById('release');
+  if (!el) return;
+  const m = (window.IDN_STORY && window.IDN_STORY.meta) || {};
+  const set = (sel, txt) => { const n = el.querySelector(sel); if (n && txt) n.textContent = txt; };
+  set('.release-title',  m.releaseTitle);
+  set('.release-sub',    m.releaseSub);
+  set('.release-prompt', '▸ ' + (m.releaseInvitation || 'PRESS ANY KEY TO BEGIN AGAIN'));
+  el.style.display = 'flex';
+  requestAnimationFrame(() => el.classList.add('lit'));   // fade the light up
+  if (window.IDN && window.IDN.glitch) window.IDN.glitch.set({ level: 0.05 });
+  let done = false;
+  const go = (e) => {
+    if (done) return;
+    if (e && (e.ctrlKey || e.metaKey || e.altKey)) return;  // let OS shortcuts through
+    if (e) e.preventDefault();
+    done = true;
+    window.removeEventListener('keydown', go, true);
+    el.removeEventListener('click', go);
+    el.classList.remove('lit');                              // fade back to the dark
+    setTimeout(() => { el.style.display = 'none'; }, 900);
+    if (window.IDNVoice){ window.IDNVoice.unlock(); window.IDNVoice.stop(); }
+    input.value = ''; input.focus();
+    relaunch();
+  };
+  window.addEventListener('keydown', go, true);
+  el.addEventListener('click', go);
+}
+
+// After a FAIL ending (retry:true), bring the loading screen back so Weebot can try
+// again WITHOUT reloading the page or re-downloading the model. Any key/click rebuilds
+// the engine (fresh state) and re-enters the narrative via relaunch().
+function showRetryLoader(){
+  const loader = document.getElementById('loader');
+  if (!loader) return;
+  const m = (window.IDN_STORY && window.IDN_STORY.meta) || {};
+  const promptEl = loader.querySelector('.loader-prompt');
+  if (promptEl) promptEl.textContent = '▸ ' + (m.retryInvitation || m.invitation || 'PRESS ANY KEY TO TRY AGAIN');
+  loader.style.display = '';            // undo the display:none set after the first boot
+  loader.classList.remove('hide');
+  let done = false;
+  const go = (e) => {
+    if (done) return;
+    if (e && (e.ctrlKey || e.metaKey || e.altKey)) return;  // let OS shortcuts through
+    if (e) e.preventDefault();
+    done = true;
+    window.removeEventListener('keydown', go, true);
+    loader.removeEventListener('click', go);
+    if (window.IDNVoice){ window.IDNVoice.unlock(); window.IDNVoice.stop(); }
+    loader.classList.add('hide');
+    setTimeout(() => { loader.style.display = 'none'; }, 650);
+    input.value = ''; input.focus();
+    relaunch();
+  };
+  window.addEventListener('keydown', go, true);
+  loader.addEventListener('click', go);
+}
+
+// A fresh attempt: rebuild the engine (resets world/patience/turnCount/mood), clear the
+// screen, and re-enter the narrative (re-voiced opener + in-character controls). Mirrors
+// the tail of bootSeq(); no model download (already cached).
+async function relaunch(){
+  if (window.IDNEngineClass && window.IDN_STORY){
+    window.IDNEngine = new window.IDNEngineClass(window.IDN_STORY, (window.IDNEngine && window.IDNEngine.opts) || {});
+  }
+  transcript.innerHTML = ''; history.length = 0;
+  const botSlot = document.createElement('div'); botSlot.className = 'bot-slot'; transcript.appendChild(botSlot);
+  let opener;
+  if (CONFIG.backend === 'engine' && window.IDNEngine){
+    window.IDNEngine.reflectCurrent();
+    try { opener = await window.IDNEngine.openingBeatVoiced(); }
+    catch (e){ opener = window.IDNEngine.openingBeat(); }
+  } else { opener = CONFIG.opener; }
+  await typeOutParagraphs(botSlot, opener, CONFIG.typeSpeed);
+  const canSpeak = !!(window.IDNSpeech && window.IDNSpeech.supported());
+  const rules = canSpeak
+    ? "Address me in WRITING — inscribe your words and strike ENTER — or, if you must use that grating little voice of yours, HOLD the space bar while you speak and release it the instant you are done."
+    : "Address me in WRITING: inscribe your words and strike ENTER.";
+  addLine("▸ " + rules, "sys");
+  if (window.IDNVoice && window.IDNVoice.enabled) window.IDNVoice.speak(rules);
+}
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const v = input.value;
+  input.value = '';
+  handleSubmit(v);
+});
+
+document.addEventListener('click', (e) => {
+  // don't steal focus from selection actions
+  if (window.getSelection && String(window.getSelection())) return;
+  input.focus();
+});
+// NOTE: initial focus is deferred to the loading screen's start handler (below),
+// so the very first keypress starts the experience instead of typing into a
+// hidden input.
+// (Voice-input wiring lives at the very end, after window.IDN is assembled — so
+//  engine/speech.js's lazy config reads the real CONFIG.speech.)
+
+/* ---------------- status bar ragged offsets (horizontal only) ---------------- */
+function reRagStatusBar(){
+  const items = document.querySelectorAll('#statusbar .left > *, #statusbar .right > *');
+  items.forEach(it => {
+    const amp = 1 + glitch.level;
+    // X-only nudge — no Y, no rotation
+    it.style.transform = 'translateX(' + r(3*amp) + 'px)';
+  });
+}
+
+/* ===========================================================================
+ * CLOCK  —  date/time shown in the status bar (backend-controllable).
+ *
+ *   clock.date     = "1-JAN-87";   // string — shown verbatim
+ *   clock.time     = "1:44 AM";    // string — shown verbatim
+ *   clock.offsetMs = 86400000;     // ms applied to system time
+ *   clock.freeze   = true;         // stop the time from advancing
+ *   clock.formatter = (now) => ({ date: "...", time: "..." });
+ *   clock.set({ date:"01-JAN-87", time:"01:44:00" });
+ *   clock.clear();                 // back to live system time
+ *
+ * Set clock.date/clock.time to null to fall back to the live value per-field.
+ * ===========================================================================*/
+const clock = {
+  date:      null,
+  time:      null,
+  offsetMs:  0,
+  freeze:    false,
+  formatter: null,
+  _frozenAt: null,
+  set(partial){ Object.assign(this, partial); tick(); },
+  clear(){
+    this.date = null; this.time = null;
+    this.offsetMs = 0; this.freeze = false;
+    this.formatter = null; this._frozenAt = null;
+    tick();
+  }
+};
+
+function pad(n){ return n<10?'0'+n:''+n }
+const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+function defaultFormat(d){
+  return {
+    date: pad(d.getDate()) + '-' + MONTHS[d.getMonth()] + '-' + String(d.getFullYear()).slice(-2),
+    time: pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds())
+  };
+}
+
+function tick(){
+  let now;
+  if (clock.freeze){
+    if (!clock._frozenAt) clock._frozenAt = new Date(Date.now() + clock.offsetMs);
+    now = clock._frozenAt;
+  } else {
+    clock._frozenAt = null;
+    now = new Date(Date.now() + clock.offsetMs);
+  }
+
+  const fmt = (clock.formatter ? clock.formatter(now) : defaultFormat(now)) || {};
+  const dateStr = clock.date !== null ? String(clock.date) : fmt.date;
+  const timeStr = clock.time !== null ? String(clock.time) : fmt.time;
+
+  document.getElementById('date').textContent = dateStr;
+  document.getElementById('time').textContent = timeStr;
+  reRagStatusBar();
+}
+tick(); setInterval(tick, 1000);
+
+
+/* ===========================================================================
+ * 5. GLITCH ENGINE  —  effect primitives + stochastic scheduler
+ *    All effects are short, additive, and self-clearing.
+ * ===========================================================================*/
+
+function tearOnce(){
+  const screenH = screen.clientHeight;
+  const y = Math.floor(Math.random() * screenH);
+  const dx = r(40) * (0.4 + glitch.level);
+  document.documentElement.style.setProperty('--tear-x', dx + 'px');
+  document.documentElement.style.setProperty('--tear-y', y + 'px');
+
+  // briefly translateX the entire content
+  const prev = content.style.transform;
+  content.style.transform = `translateX(${dx*0.4}px) skewX(${r(1.5)*glitch.level}deg)`;
+  setTimeout(() => { content.style.transform = prev; }, 70 + Math.random()*120);
+}
+
+function flashOnce(){
+  const intensity = 0.25 + 0.55 * glitch.level;
+  document.documentElement.style.setProperty('--flash', String(intensity));
+  setTimeout(() => {
+    document.documentElement.style.setProperty('--flash', '0');
+  }, 60 + Math.random()*120);
+}
+
+function chromaOnce(){
+  const amt = (2 + 6 * glitch.level) * (0.5 + Math.random());
+  document.documentElement.style.setProperty('--chroma-x', amt + 'px');
+  const lines = document.querySelectorAll('.transcript .line');
+  const last = Array.from(lines).slice(-8);
+  last.forEach(l => l.classList.add('chroma'));
+  setTimeout(() => {
+    last.forEach(l => l.classList.remove('chroma'));
+  }, 180 + Math.random()*220);
+}
+
+function skewOnce(){
+  const s = r(2.2) * glitch.level;
+  document.documentElement.style.setProperty('--skew', s + 'deg');
+  setTimeout(() => {
+    document.documentElement.style.setProperty('--skew', '0deg');
+  }, 90 + Math.random()*180);
+}
+
+function jitterLinesOnce(){
+  const lines = document.querySelectorAll('.transcript .line, .transcript .turn-rule');
+  Array.from(lines).forEach(l => {
+    if (Math.random() < 0.4) applyRaggedness(l, { amp: 1.4 });
+  });
+}
+
+/* Character overlap: pick a line, split it into glyph spans, randomly nudge
+   each glyph horizontally — sometimes into its neighbour. Restores after a
+   short window. Never touches Y. */
+function overlapOnce(){
+  const lines = Array.from(document.querySelectorAll('.transcript .line'))
+    .filter(l => l.textContent && l.textContent.length > 4);
+  if (!lines.length) return;
+  const k = 1 + Math.floor(Math.random() * Math.min(3, lines.length));
+  const picked = [];
+  for (let i = 0; i < k; i++){
+    picked.push(lines[Math.floor(Math.random() * lines.length)]);
+  }
+
+  const restores = [];
+  picked.forEach(line => {
+    const original = line.textContent;
+    const wasThinking = line.classList.contains('thinking');
+    line.classList.remove('thinking');
+
+    line.textContent = '';
+    const frag = document.createDocumentFragment();
+    const amp = 2 + 8 * glitch.level; // up to ~10px nudge
+    for (const ch of original){
+      if (ch === '\n'){ frag.appendChild(document.createTextNode('\n')); continue; }
+      const s = document.createElement('span');
+      s.className = 'glyph';
+      s.textContent = ch;
+      s.style.setProperty('--gx', r(amp) + 'px');
+      frag.appendChild(s);
+    }
+    line.appendChild(frag);
+
+    restores.push(() => {
+      line.textContent = original;
+      if (wasThinking) line.classList.add('thinking');
+    });
+  });
+
+  setTimeout(() => restores.forEach(fn => fn()), 180 + Math.random()*220);
+}
+
+function rollEvent(){
+  if (!glitch.enabled) return scheduleNext();
+  if (glitch.level <= 0)    return scheduleNext();
+
+  const choices = [
+    ['tear',    glitch.tearBias],
+    ['flash',   glitch.flashBias * 0.7],
+    ['chroma',  glitch.chromaBias],
+    ['skew',    glitch.skewBias * 0.8],
+    ['jitter',  glitch.jitterBias * 1.2],
+    ['overlap', (glitch.overlapBias ?? 1.0) * 1.3],
+  ];
+  const total = choices.reduce((s, c) => s + c[1], 0);
+  let pick = Math.random() * total;
+  let kind = 'tear';
+  for (const [k, w] of choices){
+    if ((pick -= w) <= 0){ kind = k; break; }
+  }
+
+  switch(kind){
+    case 'tear':    tearOnce();        break;
+    case 'flash':   flashOnce();       break;
+    case 'chroma':  chromaOnce();      break;
+    case 'skew':    skewOnce();        break;
+    case 'jitter':  jitterLinesOnce(); break;
+    case 'overlap': overlapOnce();     break;
+  }
+
+  // SYNC: fire a matching audio blip the instant the visual glitch happens, so
+  // the picture and the sound break together (engine/voice.js · IDNVoice.sfx).
+  if (window.IDNVoice && window.IDNVoice.sfx) window.IDNVoice.sfx.blip(kind);
+
+  // chain a quick second event if very glitchy
+  if (glitch.level > 0.7 && Math.random() < 0.5){
+    setTimeout(rollEvent, 60 + Math.random()*120);
+    return;
+  }
+  scheduleNext();
+}
+
+function scheduleNext(){
+  // mean interval shrinks as level grows: ~12s at 0, ~1.2s at 1
+  const base = 12000 / (1 + glitch.level * 10);
+  const wait = base * (0.4 + Math.random() * 1.6);
+  setTimeout(rollEvent, wait);
+}
+scheduleNext();
+
+
+/* ===========================================================================
+ * 6. BOOT  —  power-on sequence, then the opening narration
+ * ===========================================================================*/
+const bootEl = document.getElementById('boot');
+
+// The "LOCAL MODEL" line reflects the configured backend, so a glance at the
+// boot screen tells you what you're actually talking to.
+const llmProvider = (CONFIG.llm && CONFIG.llm.provider) || 'ollama';
+const llmModel = llmProvider === 'webllm'
+  ? ((CONFIG.webllm && CONFIG.webllm.model) || 'webllm')
+  : (CONFIG.ollama && CONFIG.ollama.model);
+const modelLine =
+  CONFIG.backend === 'mock'
+    ? 'LOCAL MODEL ............. MOCK (offline)'
+    : 'LOCAL MODEL ............. ' + llmProvider.toUpperCase() + ' · ' + llmModel;
+
+// Reflect the voice subsystem so a glance at boot says what you'll hear.
+const voiceLine =
+  (CONFIG.voice && CONFIG.voice.enabled === false)
+    ? 'AUDIO SUBSYSTEM ......... OFFLINE'
+    : 'AUDIO SUBSYSTEM ......... SAM · ' +
+      String((CONFIG.voice && CONFIG.voice.preset) || 'crt').toUpperCase() + ' · WEB-AUDIO';
+
+// Reflect the speech-to-text (voice control) subsystem too, so a glance at boot
+// says whether — and how — you can talk to it. window.IDN isn't assembled yet here,
+// so probe the CONFIGURED provider directly rather than via the active-provider API.
+const sttLine = (() => {
+  const sp = CONFIG.speech || {};
+  if (sp.enabled === false) return 'VOICE INPUT ............. OFFLINE';
+  const provName = String(sp.provider || 'webspeech');
+  const prov = window.IDNSpeech && window.IDNSpeech.providers && window.IDNSpeech.providers[provName];
+  if (!(prov && prov.supported && prov.supported())) return 'VOICE INPUT ............. NONE — TYPE TO PLAY';
+  const mode = sp.continuous ? ' · HANDS-FREE' : ' · TAP-TO-TALK';
+  const noCloud = (provName === 'whisper' || sp.localOnly) ? ' · NO-CLOUD' : '';
+  return 'VOICE INPUT ............. ' + provName.toUpperCase() + mode + noCloud;
+})();
+
+const bootLines = [
+  "IDN/OS · BOOT MONITOR",
+  "(C) NARRATIVE SYSTEMS — ALL RIGHTS DEFERRED",
+  "",
+  "POST .................... OK",
+  "MEMORY CHECK ............ 640K OK",
+  "PHOSPHOR INTEGRITY ...... 87%  ▒░░",
+  "CRT WARM-UP ............. OK",
+  modelLine,
+  "NARRATOR LINK ........... handshake OK",
+  voiceLine,
+  sttLine,
+  "",
+  "LOADING NARRATIVE KERNEL…",
+  "READY."
+];
+
+// Runtime nudge: if the configured LLM is Ollama but it isn't answering, the engine
+// silently falls back to authored text — which reads like "the model isn't connected".
+// Say so plainly, in-terminal, with the one-line fix. Only when actually unreachable.
+async function maybeWarnNoLLM(){
+  try {
+    if (!window.IDNLLM || CONFIG.backend === 'mock') return;
+    const prov = (CONFIG.llm && CONFIG.llm.provider) || 'ollama';
+    const ok = await window.IDNLLM.available();   // provider-specific (null = can't tell → don't nag)
+    if (ok !== false) return;
+    // No model is answering → the engine is keyword-routing + showing beats verbatim.
+    // That's why open-ended input (e.g. a bare name) may not advance. Say so.
+    addLine("NARRATOR LINK · OFFLINE — no model answering; routing is keyword-only, beats shown as written.", "sys");
+    if (prov === 'webllm'){
+      if (location.protocol === 'file:'){
+        addLine("  WebLLM can't run from a double-clicked file. Serve it:  python3 serve.py", "sys");
+        addLine("  then open the printed http://localhost URL in Chrome/Edge (WebGPU).", "sys");
+      } else {
+        let why = "";
+        try { const p = window.IDNLLM.providers && window.IDNLLM.providers.webllm;
+              const e = p && p.error && p.error(); if (e) why = "  — " + String(e.message || e).slice(0, 90); } catch(_){}
+        addLine("  served, but the in-browser model didn't load (need a WebGPU browser: Chrome/Edge)." + why, "sys");
+        addLine("  check the browser console for details, then /reset to retry.", "sys");
+      }
+    } else {
+      addLine("  start the local model:  OLLAMA_ORIGINS='*' ollama serve   ·  then /reset", "sys");
+    }
+  } catch (e){ /* never block boot on the probe */ }
+}
+
+async function bootSeq(){
+  for (const ln of bootLines){
+    bootEl.textContent += ln + "\n";
+    await new Promise(r => setTimeout(r, 90 + Math.random()*90));
+  }
+  await new Promise(r => setTimeout(r, 350));
+  bootEl.classList.add('fade');
+  flashOnce(); // little welcome flash
+
+  addLine("CONNECTION ESTABLISHED.", "sys");
+  await maybeWarnNoLLM();   // tells you (and prints the fix) if Ollama isn't reachable
+
+  const botSlot = document.createElement('div');
+  botSlot.className = 'bot-slot';
+  transcript.appendChild(botSlot);
+  // In engine mode the opener is the start node's authored beat (shown verbatim
+  // for an instant, reliable boot; re-voicing begins on the first player turn).
+  // The opener is the start node's beat — but RE-VOICED through the model each load so
+  // repeated testing isn't monotonous (falls back to the authored beat if the model is
+  // off/weak). reflectCurrent() runs first so the (menacing) voice + glitch are set.
+  let opener;
+  if (CONFIG.backend === 'engine' && window.IDNEngine) {
+    window.IDNEngine.reflectCurrent();
+    try { opener = await window.IDNEngine.openingBeatVoiced(); }
+    catch (e) { opener = window.IDNEngine.openingBeat(); }
+  } else {
+    opener = CONFIG.opener;
+  }
+  // Pace the opener like everything else — matched to the voice (the loading
+  // screen already unlocked audio before boot ran), or CONFIG.typeSpeed if off.
+  await typeOutParagraphs(botSlot, opener, CONFIG.typeSpeed);
+
+  // Convey the controls as part of the opening (todo: "verbally convey the rules").
+  // Shown always; SPOKEN too when the narrator voice is on. Mentions push-to-talk
+  // only when a recogniser actually exists in this browser/build.
+  const canSpeak = !!(window.IDNSpeech && window.IDNSpeech.supported());
+  // The controls, but in Clod's mouth (stays FIXED — not re-voiced like the opener).
+  const rules = canSpeak
+    ? "Address me in WRITING — inscribe your words and strike ENTER — or, if you must use that grating little voice of yours, HOLD the space bar while you speak and release it the instant you are done."
+    : "Address me in WRITING: inscribe your words and strike ENTER.";
+  addLine("▸ " + rules, "sys");
+  if (window.IDNVoice && window.IDNVoice.enabled) window.IDNVoice.speak(rules);
+}
+
+/* ===========================================================================
+ * LOADING SCREEN — hold until the first user gesture, which is what lets the
+ * browser start audio. We unlock the AudioContext + ambient bed HERE, then run
+ * boot(): the background hum is already up and the opening narration is voiced.
+ * (voice.js also unlocks on any gesture; calling unlock() twice is harmless.)
+ * ===========================================================================*/
+(function(){
+  const loader = document.getElementById('loader');
+  // Theme the loader + status bar from the active story (falls back to IDN/OS for
+  // stories that don't set meta.terminal / meta.invitation, e.g. SIGNAL).
+  try {
+    const _m = (window.IDN_STORY && window.IDN_STORY.meta) || {};
+    const _term = _m.terminal || 'IDN/OS';
+    const _tEl = loader.querySelector('.loader-title');  if (_tEl) _tEl.textContent = _term;
+    const _subEl = loader.querySelector('.loader-sub');  if (_subEl && _m.terminalSub) _subEl.textContent = _m.terminalSub;
+    const _pEl = loader.querySelector('.loader-prompt'); if (_pEl && _m.invitation) _pEl.textContent = '▸ ' + _m.invitation;
+    const _sEl = document.querySelector('#statusbar .sys'); if (_sEl) _sEl.textContent = _term;
+    // Show the "needs a WebGPU browser" note ONLY for the in-browser model build —
+    // the Ollama/folder build runs from file:// and needs no WebGPU.
+    const _prov = (window.IDNLLM && IDNLLM.provider && IDNLLM.provider()) ||
+                  (window.IDN && IDN.config && IDN.config.llm && IDN.config.llm.provider);
+    const _nEl = loader.querySelector('.loader-note'); if (_nEl && _prov === 'webllm') _nEl.style.display = 'block';
+  } catch (e) {}
+  let started = false;
+  async function startExperience(){
+    if (started) return;
+    started = true;
+    if (window.IDNVoice) window.IDNVoice.unlock();   // the all-important first gesture
+
+    // WebLLM: download / warm up the in-browser model BEFORE booting, showing
+    // progress on the loader. (Ollama/other providers: init() is a no-op and this
+    // returns instantly.) If it fails — no WebGPU, offline — we boot anyway and
+    // the engine falls back to keyword routing + authored beats.
+    const promptEl = loader.querySelector('.loader-prompt');
+    if (window.IDNLLM && IDNLLM.provider && IDNLLM.provider() === 'webllm'){
+      if (location.protocol === 'file:'){
+        // WebLLM's module worker + WebGPU can't load from file:// — it needs http.
+        if (promptEl) promptEl.textContent = "▸ WEBLLM NEEDS A SERVER — run:  python3 serve.py   (continuing offline)";
+        console.warn('[IDN] WebLLM is selected but the page is file://. Serve over http (python3 serve.py), or use the Ollama folder build.');
+        await new Promise(r => setTimeout(r, 1600));
+      } else {
+        try {
+          await IDNLLM.init((p) => {
+            const pct = (p && typeof p.progress === 'number') ? Math.round(p.progress * 100) : null;
+            if (promptEl) promptEl.textContent = '▸ LOADING MODEL' +
+              (pct != null ? '  ' + pct + '%' : (p && p.text ? '  ' + String(p.text).slice(0, 48) : '  …'));
+          });
+        } catch (e){
+          console.warn('[IDN] WebLLM init failed; continuing with authored text:', e);
+          if (promptEl) promptEl.textContent = '▸ MODEL UNAVAILABLE (needs a WebGPU browser) — CONTINUING';
+          await new Promise(r => setTimeout(r, 1400));
+        }
+      }
+    }
+
+    // Pre-download the SPEECH-TO-TEXT model now too (offline Whisper otherwise streams it
+    // lazily on the FIRST mic press — which interrupts that first attempt to speak). Only
+    // when a recogniser exists + is enabled + CONFIG.speech.preload; webspeech's init() is a
+    // no-op so this does real work only for whisper. It's a plain network fetch (no mic).
+    if (CONFIG.speech.preload !== false &&
+        window.IDNSpeech && IDNSpeech.supported && IDNSpeech.supported() && IDNSpeech.enabled && IDNSpeech.init){
+      try {
+        if (promptEl) promptEl.textContent = '▸ LOADING SPEECH MODEL  …';
+        await IDNSpeech.init((p) => {                   // whisper reports a status STRING
+          if (!promptEl) return;
+          let msg = (typeof p === 'string') ? p
+                  : (p && typeof p.progress === 'number') ? 'downloading model ' + Math.round(p.progress) + '%' : '';
+          msg = msg.replace(/^VOICE INPUT · /i, '').trim();
+          if (msg) promptEl.textContent = '▸ SPEECH · ' + msg.toUpperCase();
+        });
+      } catch (e){
+        console.warn('[IDN] speech model pre-warm failed; it will load on first mic use instead:', e);
+      }
+    }
+
+    loader.classList.add('hide');
+    setTimeout(() => { loader.style.display = 'none'; }, 650);
+    input.value = '';   // discard any stray character from the starting keypress
+    input.focus();
+    bootSeq();
+  }
+  loader.addEventListener('click', startExperience);
+  loader.addEventListener('touchstart', startExperience, { passive: true });
+  window.addEventListener('keydown', (e) => {
+    if (started) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;  // let browser/OS shortcuts through
+    e.preventDefault();                              // don't leak the starting key into the input
+    startExperience();
+  });
+})();
+
+
+/* ===========================================================================
+ * Assemble the public runtime API last, once everything exists.
+ * ===========================================================================*/
+window.IDN = {
+  config: CONFIG,
+  glitch,
+  clock,
+  history,
+  /** Voice / TTS sound-design layer (engine/voice.js). e.g.
+   *  IDN.voice.setPreset('haunted'); IDN.voice.fx.lp.frequency.value = 2000; */
+  voice: window.IDNVoice,
+  /** Speech-to-text / voice control (engine/speech.js). e.g.
+   *  IDN.speech.start();  IDN.speech.on('final', t => console.log('heard:', t)); */
+  speech: window.IDNSpeech,
+  /** Inject a line into the transcript. kind: 'bot' | 'you' | 'sys' | 'err' */
+  print: (text, kind='sys') => addLine(text, kind),
+  /** Send text through the backend exactly as if the user typed it. */
+  say: (text) => handleSubmit(text),
+};
+// Back-compat aliases (earlier versions exposed these directly).
+window.glitch = glitch;
+window.clock  = clock;
+
+/* ---- VOICE CONTROL (speech-to-text) — wire engine/speech.js to the prompt ----
+ * Done here, last, so IDNSpeech's lazy config sees the assembled window.IDN.config.
+ * A recognised phrase flows into handleSubmit() exactly like typed text; interim
+ * words preview live in the input box. The mic button reveals itself ONLY if the
+ * browser actually has a recogniser (attach adds .available); on an unsupported
+ * browser this whole block is a quiet no-op and you just type. */
+(function(){
+  const micbtn = document.getElementById('micbtn');
+  if (window.IDNSpeech){
+    window.IDNSpeech.attach({ input, button: micbtn, submit: handleSubmit });
+
+    // Sound cues for the mic lifecycle (engine/voice.js · IDNVoice.cue): a chirp when
+    // capture goes live / stops, and a soft pulsing bed while the model transcribes.
+    const cue = () => (window.IDNVoice && window.IDNVoice.cue) || null;
+    window.IDNSpeech.on('start', () => { const c = cue(); if (c) c.micOn(); });
+    window.IDNSpeech.on('end',   () => { const c = cue(); if (c){ c.processingStop(); c.micOff(); } });
+
+    // Provider status (e.g. the offline Whisper model downloading on first use, or
+    // "transcribing…") -> one self-updating line, cleared when the message is empty.
+    // The "transcribing" phase also raises/lowers the processing cue bed.
+    let statusEl = null;
+    window.IDNSpeech.on('status', (msg) => {
+      const c = cue();
+      if (c){ if (/transcrib/i.test(msg || '')) c.processingStart(); else if (!msg) c.processingStop(); }
+      if (!msg){ if (statusEl){ statusEl.remove(); statusEl = null; } return; }
+      if (!statusEl) statusEl = addLine(msg, 'sys'); else statusEl.textContent = msg;
+      transcript.scrollTop = transcript.scrollHeight;
+    });
+
+    // Explain a silent failure in-terminal (mirrors the LLM-offline warning).
+    window.IDNSpeech.on('error', (code) => {
+      { const c = cue(); if (c) c.processingStop(); }     // never leave the bed droning
+      if (code === 'not-allowed' || code === 'service-not-allowed' || code === 'mic-failed'){
+        addLine("VOICE INPUT · MIC BLOCKED — allow microphone access (and serve over http) to speak.", "sys");
+      } else if (code === 'local-unavailable'){
+        addLine("VOICE INPUT · ON-DEVICE SPEECH UNAVAILABLE here. For guaranteed offline set CONFIG.speech.provider='whisper'; or localOnly:false to allow the cloud.", "sys");
+      } else if (code === 'model-load-failed'){
+        addLine("VOICE INPUT · offline model failed to load (needs http + a modern browser). See the console.", "sys");
+      } else if (code === 'transcribe-failed'){
+        addLine("VOICE INPUT · transcription failed — try again, or pick a smaller CONFIG.speech.whisper.model.", "sys");
+      }
+    });
+
+    // Spacebar PUSH-TO-TALK: hold Space on an EMPTY, focused prompt to speak; release
+    // to transcribe + submit one phrase. (With text in the prompt, Space types a space
+    // as usual — we only hijack the empty case, and a message never starts with a space.)
+    // This deterministic hold beats the silence endpointer; tap-to-talk still works too.
+    if (window.IDNSpeech.supported()){
+      let pttHeld = false;
+      const isSpace = (e) => e.code === 'Space' || e.key === ' ' || e.keyCode === 32;
+      const pttOk = () => !pttHeld && !input.value && document.activeElement === input && window.IDNSpeech.enabled;
+      document.addEventListener('keydown', (e) => {
+        if (!isSpace(e)) return;
+        if (e.repeat){ if (pttHeld) e.preventDefault(); return; }   // swallow key auto-repeat
+        if (!pttOk()) return;
+        e.preventDefault();
+        pttHeld = true;
+        if (window.IDNVoice) window.IDNVoice.stop();   // barge-in: hush the narrator while you speak
+        window.IDNSpeech.push();
+      });
+      const endPtt = (e) => {
+        if (!pttHeld) return;
+        if (e && !isSpace(e)) return;
+        if (e) e.preventDefault();
+        pttHeld = false;
+        window.IDNSpeech.release();
+      };
+      document.addEventListener('keyup', endPtt);
+      window.addEventListener('blur', () => endPtt());   // lost focus mid-hold -> finalize
+    }
+  } else if (micbtn){
+    micbtn.remove();   // subsystem didn't load — remove the dead affordance
+  }
+})();
+</script>
+</body>
+</html>

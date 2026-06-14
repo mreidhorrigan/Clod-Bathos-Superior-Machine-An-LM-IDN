@@ -1,0 +1,16 @@
+IDN TERMINAL - WEB (WebLLM) BUILD
+=================================
+Runs a language model IN YOUR BROWSER via WebGPU. No server, no Ollama.
+
+Requirements:
+  - a WebGPU browser (Chrome/Edge, or recent Safari)
+  - served over http (it will NOT run from file:// - module workers + WebGPU need it)
+
+Quick local test:
+    python3 serve.py
+  (serves http://localhost:8000 and opens it). The FIRST run downloads the model
+  weights, cached by the browser afterwards - watch the loading screen for progress.
+
+Deploy: upload this whole folder to any static host (GitHub Pages, Netlify, S3, ...).
+A plain static host is enough; no special headers are required for the WebGPU path.
+Pick the model in CONFIG.webllm.model inside index.html.
