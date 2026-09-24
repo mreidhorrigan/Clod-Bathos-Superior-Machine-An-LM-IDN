@@ -16,7 +16,7 @@
  *
  * Registers as the 'webllm' provider. Contract:
  *   chat(messages, { format?, options? }) -> Promise<string>
- *   init(onProgress) -> Promise   // warm up / download the model
+ *   init(onProgress) -> Promise   // warm up / download the model (the ONLY thing that starts it)
  * ===========================================================================*/
 (function (global) {
   "use strict";
@@ -80,7 +80,11 @@
 
   async function chat(messages, opts) {
     opts = opts || {};
-    var eng = await ensureEngine();
+    // A turn never starts the download nor waits on it (a turn during a slow download
+    // hung for minutes): until init() has the model ready, fail at once, and the
+    // engine answers with the written lines (keyword routing + the authored beat).
+    if (!engine) throw new Error(enginePromise ? "the model is still loading" : "the model is not loaded");
+    var eng = engine;
     var res;
     try {
       res = await eng.chat.completions.create(requestFor(messages, opts));

@@ -6,9 +6,28 @@ works*; this file is *where things stand* and *what's next*.
 
 ---
 
-## Current state — newest first (updated 2026-06-14)
+## Current state — newest first (updated 2026-09-24)
 
-### Splash: "needs a WebGPU browser" note (NEWEST, 2026-06-14)
+### First load: say plainly what the narrator is doing (NEWEST, 2026-09-24)
+- A visitor reported the game "neither worked nor said its models hadn't loaded".
+  `tests/first-load.mjs` (headless Chrome, no GPU) showed why: without WebGPU the model
+  failed in 6 s behind a 1.4 s flash, then the loader sat ~90 s on the optional Whisper
+  speech model ("SPEECH · DOWNLOADING MODEL 25%… 65%… 30%…", jumping between files) and
+  failed that too; the game started at ~100 s with a three-line, truncated technical notice.
+- Now: the loader checks for a WebGPU adapter first (a second). None → it says so in plain
+  words ("THE AI NARRATOR CAN'T RUN IN THIS BROWSER… You can still play…") and waits for a
+  key. With WebGPU it shows the download ("about 1 GB, once") and lets you **play now**; the
+  model keeps loading behind the game and announces itself ("NARRATOR · ONLINE"). A stalled
+  download says so after 45 s. The status bar's old fixed "● ONLINE" is now the truth:
+  `NARRATOR · AI` / `NARRATOR · LOADING 45%` / `NARRATOR · WRITTEN LINES`.
+- The speech model never blocks the loader: it warms up in the background after the game
+  starts, only where WebGPU works (else on the first mic press).
+- `engine/providers/webllm.js`: `chat()` no longer starts or awaits the download (a turn
+  during a slow download hung); until `init()` has the model, turns use the written lines.
+- Check it: `node tests/first-load.mjs [url]` (no WebGPU) and `FIRST_LOAD_MODE=slow …` (a
+  faked slow download, played through). Deployed with `deploy_pages.py`.
+
+### Splash: "needs a WebGPU browser" note (2026-06-14)
 - The loader now carries a brief faint line — *"Runs an AI model in your browser — needs a
   WebGPU browser (Chrome, Edge, or Arc). First load downloads the model."* — shown ONLY when
   the active provider is `webllm` (the Ollama/`file://` folder build needs no WebGPU, so it

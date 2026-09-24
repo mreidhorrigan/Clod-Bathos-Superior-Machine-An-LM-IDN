@@ -16,8 +16,13 @@ active goal: easy/browser-side delivery) — read it first if you're picking thi
 - **Default dev run — WebLLM, no Ollama:** `python3 serve.py` → opens `http://localhost:8000/…`.
   The source `CONFIG.llm.provider` defaults to **`webllm`** (an in-browser model via WebGPU),
   so it needs **http + a WebGPU browser**, NOT a `file://` double-click. First run downloads
-  the model; the **loading screen** waits for a click/keypress (also unlocks audio) and shows
-  download progress. If opened from `file://`, the loader says to run `serve.py`.
+  the model; the **loading screen** waits for a click/keypress (also unlocks audio), checks for
+  a WebGPU adapter, and either shows download progress with a "play now" key (the model keeps
+  loading behind the game) or says plainly that the AI narrator can't run here and waits for a
+  key. The status bar always shows `NARRATOR · AI / LOADING / WRITTEN LINES`. If opened from
+  `file://`, the loader says to run `serve.py`. **Check the first-load experience with
+  `node tests/first-load.mjs [url]`** (headless, no GPU; `FIRST_LOAD_MODE=slow` fakes a slow
+  download).
 - **No-server / `file://` run — Ollama or offline:** set `CONFIG.llm.provider='ollama'` (or
   use the folder build) and double-click. Needs `OLLAMA_ORIGINS='*' ollama serve` for adaptive
   narration, else it plays the authored-text fallback.

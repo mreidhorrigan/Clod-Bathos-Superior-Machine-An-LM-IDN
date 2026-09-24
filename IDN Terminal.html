@@ -260,6 +260,7 @@
     animation: pulse 2.2s infinite;
     vertical-align: 2px;
   }
+  .dot.off{ background:transparent; box-shadow:none; animation:none; border:1px solid var(--amber-dim); }   /* the narrator is not the AI just now */
   @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
 
   .transcript{
@@ -428,8 +429,13 @@
   .loader-prompt{ margin-top:54px; font-size:24px; animation: promptblink 1.1s steps(1) infinite; }
   @keyframes promptblink{ 50%{ opacity:.2 } }
   /* requires-WebGPU note — shown only for the in-browser (WebLLM) build (see boot JS) */
-  .loader-note{ display:none; margin-top:28px; font-size:15px; color:var(--amber-faint);
-                letter-spacing:.06em; line-height:1.5; }
+  .loader-note{ display:none; margin:28px auto 0; max-width:640px; font-size:16px; color:var(--amber-dim);
+                letter-spacing:.05em; line-height:1.5; }
+  /* the narrator's state on the loader: steady (no blink) and readable, since a
+     visitor has to be able to read why the AI is not there */
+  .loader-status{ margin:26px auto 0; max-width:640px; font-size:21px; line-height:1.4;
+                  color:var(--amber-bright); letter-spacing:.04em; }
+  .loader-status[hidden]{ display:none; }
 
   /* release screen — the BRIGHT ending. Shown when the story lands on a node
      flagged `release:true` (Weebot freed): the amber dark dissolves into open
@@ -470,7 +476,10 @@
     <div class="loader-title">IDN/OS</div>
     <div class="loader-sub">NARRATIVE SYSTEMS · CARRIER TERMINAL</div>
     <div class="loader-prompt">▸ PRESS ANY KEY OR CLICK TO ESTABLISH CONNECTION</div>
-    <div class="loader-note">Runs an AI model in your browser — needs a WebGPU browser (Chrome, Edge, or Arc). First load downloads the model.</div>
+    <!-- what the AI narrator is doing, in plain words: shown while it loads, and
+         held on screen (until a key) when it cannot load in this browser -->
+    <div class="loader-status" id="loader-status" role="status" hidden></div>
+    <div class="loader-note">The narrator is an AI model that runs in your browser. It needs WebGPU (Chrome or Edge on a computer) and downloads about 1 GB the first time. Without it the story still plays, in its written lines.</div>
   </div>
 </div>
 
@@ -501,7 +510,7 @@
         <div class="left">
           <span class="sys">IDN/OS</span>
           <span>v0.3.1</span>
-          <span><span class="dot"></span> ONLINE</span>
+          <span id="narrator-state" title="The AI narrator's state"><span class="dot off"></span> <span class="state-text">NARRATOR</span></span>
         </div>
         <div class="right">
           <span id="date">--</span>
@@ -1580,32 +1589,55 @@ const bootLines = [
   "READY."
 ];
 
-// Runtime nudge: if the configured LLM is Ollama but it isn't answering, the engine
-// silently falls back to authored text — which reads like "the model isn't connected".
-// Say so plainly, in-terminal, with the one-line fix. Only when actually unreachable.
+/* ===========================================================================
+ * THE NARRATOR'S STATE, told plainly and kept true. The AI model may be answering
+ * ('ai'), still downloading ('loading': the written lines answer meanwhile), unable
+ * to run here ('offline': the written lines answer), or not asked for ('written',
+ * the mock backend). The status bar always shows which; the loading screen and the
+ * terminal say it in words, with what still works. (A visitor once met a game that
+ * seemed not to work and nothing saying its model had not loaded.)
+ * ===========================================================================*/
+const narrator = { state: '', why: '' };
+const NO_WEBGPU   = "It needs WebGPU: Chrome or Edge on a computer.";
+const STILL_PLAYS = "You can still play: the story answers with its written lines, and understands short, plain replies.";
+function setNarrator(state, detail){
+  narrator.state = state;
+  const el = document.getElementById('narrator-state'); if (!el) return;
+  const dot = el.querySelector('.dot'), txt = el.querySelector('.state-text');
+  if (txt) txt.textContent = state === 'ai' ? 'NARRATOR · AI'
+    : state === 'loading' ? 'NARRATOR · LOADING' + (detail ? ' ' + detail : '')
+    : 'NARRATOR · WRITTEN LINES';
+  if (dot) dot.classList.toggle('off', state !== 'ai');
+  el.title = state === 'ai' ? 'The AI narrator is answering.'
+    : state === 'loading' ? 'The AI narrator is still downloading. Until it is ready, the story answers with its written lines.'
+    : 'The AI narrator is not running in this browser. The story answers with its written lines.';
+}
+
+// Say in the terminal, once, at boot, what the narrator is: the AI, still loading, or
+// not running here (then why, and what still works). The engine always plays: without
+// a model it routes by keywords and shows the authored beats as written.
 async function maybeWarnNoLLM(){
   try {
-    if (!window.IDNLLM || CONFIG.backend === 'mock') return;
-    const prov = (CONFIG.llm && CONFIG.llm.provider) || 'ollama';
-    const ok = await window.IDNLLM.available();   // provider-specific (null = can't tell → don't nag)
-    if (ok !== false) return;
-    // No model is answering → the engine is keyword-routing + showing beats verbatim.
-    // That's why open-ended input (e.g. a bare name) may not advance. Say so.
-    addLine("NARRATOR LINK · OFFLINE — no model answering; routing is keyword-only, beats shown as written.", "sys");
+    if (!window.IDNLLM || CONFIG.backend === 'mock'){ setNarrator('written'); return; }
+    const prov = (window.IDNLLM.provider && window.IDNLLM.provider()) || (CONFIG.llm && CONFIG.llm.provider) || 'ollama';
     if (prov === 'webllm'){
-      if (location.protocol === 'file:'){
-        addLine("  WebLLM can't run from a double-clicked file. Serve it:  python3 serve.py", "sys");
-        addLine("  then open the printed http://localhost URL in Chrome/Edge (WebGPU).", "sys");
-      } else {
-        let why = "";
-        try { const p = window.IDNLLM.providers && window.IDNLLM.providers.webllm;
-              const e = p && p.error && p.error(); if (e) why = "  — " + String(e.message || e).slice(0, 90); } catch(_){}
-        addLine("  served, but the in-browser model didn't load (need a WebGPU browser: Chrome/Edge)." + why, "sys");
-        addLine("  check the browser console for details, then /reset to retry.", "sys");
+      if (narrator.state === 'ai') return;
+      if (narrator.state === 'loading'){
+        addLine("NARRATOR · LOADING — the AI narrator is still downloading. Until it is ready, the story answers with its written lines.", "sys");
+        return;
       }
-    } else {
-      addLine("  start the local model:  OLLAMA_ORIGINS='*' ollama serve   ·  then /reset", "sys");
+      setNarrator('offline');
+      addLine("NARRATOR · OFFLINE — the AI narrator could not load in this browser. " +
+        (location.protocol === 'file:' ? "Opened from a file it needs a server: run  python3 serve.py" : (narrator.why || NO_WEBGPU)), "sys");
+      addLine("  " + STILL_PLAYS, "sys");
+      return;
     }
+    const ok = await window.IDNLLM.available();   // provider-specific (null = can't tell → don't nag)
+    if (ok === true) setNarrator('ai');
+    if (ok !== false) return;
+    setNarrator('offline');
+    addLine("NARRATOR · OFFLINE — no model is answering, so the story answers with its written lines.", "sys");
+    addLine("  start the local model:  OLLAMA_ORIGINS='*' ollama serve   ·  then /reset", "sys");
   } catch (e){ /* never block boot on the probe */ }
 }
 
@@ -1682,51 +1714,98 @@ async function bootSeq(){
     started = true;
     if (window.IDNVoice) window.IDNVoice.unlock();   // the all-important first gesture
 
-    // WebLLM: download / warm up the in-browser model BEFORE booting, showing
-    // progress on the loader. (Ollama/other providers: init() is a no-op and this
-    // returns instantly.) If it fails — no WebGPU, offline — we boot anyway and
-    // the engine falls back to keyword routing + authored beats.
-    const promptEl = loader.querySelector('.loader-prompt');
+    // WebLLM: first ask whether this browser can run the model at all (WebGPU,
+    // a second's check), so a browser without it hears so at once instead of
+    // after a download. Then download it with its progress, with a way to play
+    // now: the model keeps loading behind the game and says when it is ready.
+    // Where it cannot load, the loading screen says why and what still works,
+    // and waits for a key, so the notice is read. (Ollama/other providers:
+    // init() is a no-op; the terminal reports them at boot.)
+    const promptEl = loader.querySelector('.loader-prompt'), statusEl = document.getElementById('loader-status');
+    const tell = (t) => { if (statusEl){ statusEl.textContent = t || ''; statusEl.hidden = !t; } };
+    const playAnyway = () => { if (promptEl) promptEl.textContent = '▸ PRESS ANY KEY OR CLICK TO PLAY WITHOUT IT'; };
+    // the next click, tap or key on the loading screen (the one that started this is past)
+    const nextGesture = () => {
+      let off = () => {};
+      const p = new Promise((res) => {
+        const go = (e) => {
+          if (e.type === 'keydown'){ if (e.ctrlKey || e.metaKey || e.altKey) return; e.preventDefault(); }
+          off(); res();
+        };
+        off = () => { clearTimeout(t); loader.removeEventListener('click', go); loader.removeEventListener('touchstart', go); window.removeEventListener('keydown', go, true); };
+        const t = setTimeout(() => { loader.addEventListener('click', go); loader.addEventListener('touchstart', go, { passive: true }); window.addEventListener('keydown', go, true); }, 400);
+      });
+      return { promise: p, cancel: () => off() };
+    };
+    let modelLoad = null, gpuReady = false;
     if (window.IDNLLM && IDNLLM.provider && IDNLLM.provider() === 'webllm'){
       if (location.protocol === 'file:'){
         // WebLLM's module worker + WebGPU can't load from file:// — it needs http.
-        if (promptEl) promptEl.textContent = "▸ WEBLLM NEEDS A SERVER — run:  python3 serve.py   (continuing offline)";
         console.warn('[IDN] WebLLM is selected but the page is file://. Serve over http (python3 serve.py), or use the Ollama folder build.');
-        await new Promise(r => setTimeout(r, 1600));
+        setNarrator('offline');
+        tell("THE AI NARRATOR NEEDS A SERVER. Opened from a file it cannot run: run  python3 serve.py  and open the address it prints. " + STILL_PLAYS);
+        playAnyway(); await nextGesture().promise;
       } else {
-        try {
-          await IDNLLM.init((p) => {
-            const pct = (p && typeof p.progress === 'number') ? Math.round(p.progress * 100) : null;
-            if (promptEl) promptEl.textContent = '▸ LOADING MODEL' +
-              (pct != null ? '  ' + pct + '%' : (p && p.text ? '  ' + String(p.text).slice(0, 48) : '  …'));
+        try { gpuReady = !!(navigator.gpu && await navigator.gpu.requestAdapter()); } catch (e) { gpuReady = false; }
+        if (!gpuReady){
+          console.warn('[IDN] no WebGPU adapter: the AI narrator cannot run here; continuing with the written lines.');
+          narrator.why = NO_WEBGPU; setNarrator('offline');
+          tell("THE AI NARRATOR CAN'T RUN IN THIS BROWSER. " + NO_WEBGPU + " " + STILL_PLAYS);
+          playAnyway(); await nextGesture().promise;
+        } else {
+          setNarrator('loading');
+          if (promptEl) promptEl.textContent = '▸ LOADING THE AI NARRATOR  …';   // at once: the first progress can be seconds off
+          let beat = Date.now(), pct = null;
+          modelLoad = IDNLLM.init((p) => {
+            beat = Date.now();
+            if (p && typeof p.progress === 'number') pct = Math.round(p.progress * 100);
+            if (promptEl && narrator.state === 'loading') promptEl.textContent = '▸ LOADING THE AI NARRATOR' + (pct != null ? '  ' + pct + '%' : '  …');
+            if (narrator.state === 'loading') setNarrator('loading', pct != null ? pct + '%' : '');
           });
-        } catch (e){
-          console.warn('[IDN] WebLLM init failed; continuing with authored text:', e);
-          if (promptEl) promptEl.textContent = '▸ MODEL UNAVAILABLE (needs a WebGPU browser) — CONTINUING';
-          await new Promise(r => setTimeout(r, 1400));
+          tell("About 1 GB, downloaded once and kept by your browser. Press any key or click to play now: the story answers with its written lines until the narrator is ready.");
+          const stall = setInterval(() => {
+            if (Date.now() - beat > 45000) tell("The download seems to have stalled. Press any key or click to play now, with the story's written lines. The narrator joins in if it finishes.");
+          }, 5000);
+          const skip = nextGesture();
+          const outcome = await Promise.race([
+            modelLoad.then(() => 'ready', (e) => { console.warn('[IDN] WebLLM init failed; continuing with authored text:', e); return 'failed'; }),
+            skip.promise.then(() => 'skipped'),
+          ]);
+          clearInterval(stall); skip.cancel();
+          if (outcome === 'ready') setNarrator('ai');
+          else if (outcome === 'failed'){
+            narrator.why = "It needs WebGPU and enough graphics memory: Chrome or Edge on a computer.";
+            setNarrator('offline');
+            tell("THE AI NARRATOR COULD NOT LOAD. " + narrator.why + " " + STILL_PLAYS);
+            playAnyway(); await nextGesture().promise;
+          } else {
+            // played on before the model was ready: it keeps loading, and says so when it is
+            modelLoad.then(() => {
+              setNarrator('ai');
+              addLine("NARRATOR · ONLINE — the AI narrator has loaded, and answers from your next turn.", "sys");
+            }, (e) => {
+              console.warn('[IDN] WebLLM init failed; continuing with authored text:', e);
+              narrator.why = "It needs WebGPU and enough graphics memory: Chrome or Edge on a computer.";
+              setNarrator('offline');
+              addLine("NARRATOR · OFFLINE — the AI narrator could not load. " + STILL_PLAYS, "sys");
+            });
+          }
         }
       }
     }
+    tell('');
 
-    // Pre-download the SPEECH-TO-TEXT model now too (offline Whisper otherwise streams it
-    // lazily on the FIRST mic press — which interrupts that first attempt to speak). Only
-    // when a recogniser exists + is enabled + CONFIG.speech.preload; webspeech's init() is a
-    // no-op so this does real work only for whisper. It's a plain network fetch (no mic).
-    if (CONFIG.speech.preload !== false &&
-        window.IDNSpeech && IDNSpeech.supported && IDNSpeech.supported() && IDNSpeech.enabled && IDNSpeech.init){
-      try {
-        if (promptEl) promptEl.textContent = '▸ LOADING SPEECH MODEL  …';
-        await IDNSpeech.init((p) => {                   // whisper reports a status STRING
-          if (!promptEl) return;
-          let msg = (typeof p === 'string') ? p
-                  : (p && typeof p.progress === 'number') ? 'downloading model ' + Math.round(p.progress) + '%' : '';
-          msg = msg.replace(/^VOICE INPUT · /i, '').trim();
-          if (msg) promptEl.textContent = '▸ SPEECH · ' + msg.toUpperCase();
-        });
-      } catch (e){
-        console.warn('[IDN] speech model pre-warm failed; it will load on first mic use instead:', e);
-      }
-    }
+    // The speech-to-text model is optional (typing is the way to play), so it never
+    // holds the loading screen: without WebGPU it took a minute and a half there and
+    // then failed. It warms up in the background once the game runs, only where
+    // WebGPU works and after the narrator's download, so the two do not compete.
+    // Elsewhere it loads on the first press of the mic.
+    const warmSpeech = () => {
+      if (!gpuReady || CONFIG.speech.preload === false) return;
+      if (!(window.IDNSpeech && IDNSpeech.supported && IDNSpeech.supported() && IDNSpeech.enabled && IDNSpeech.init)) return;
+      IDNSpeech.init().catch((e) => console.warn('[IDN] speech model pre-warm failed; it will load on first mic use instead:', e));
+    };
+    (modelLoad ? modelLoad.catch(() => {}) : Promise.resolve()).then(warmSpeech);
 
     loader.classList.add('hide');
     setTimeout(() => { loader.style.display = 'none'; }, 650);
