@@ -33,6 +33,13 @@ const profile = mkdtempSync(join(tmpdir(), "first-load-"));
 const port = 9800 + Math.floor(Math.random() * 150);
 const chrome = spawn("taskpolicy", ["-b", CHROME, "--headless=new", "--disable-gpu", "--mute-audio", "--no-first-run",
   "--window-size=1200,800", "--remote-debugging-port=" + port, "--user-data-dir=" + profile, "about:blank"], { stdio: "ignore" });
+// however this ends (done, an error, Ctrl-C), the browser goes with it: a Chrome left
+// behind by a run that threw kept a page spinning for most of a day (2026-09-24)
+const stopChrome = () => { try { chrome.kill("SIGKILL"); } catch (e) { /* gone */ } };
+process.on("exit", stopChrome);
+for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => { stopChrome(); process.exit(130); });
+process.on("uncaughtException", (e) => { console.log("ERROR " + (e && e.stack || e)); stopChrome(); process.exit(1); });
+process.on("unhandledRejection", (e) => { console.log("ERROR " + (e && e.stack || e)); stopChrome(); process.exit(1); });
 let ws = null;
 for (let i = 0; i < 100 && !ws; i++) {
   await sleep(200);
