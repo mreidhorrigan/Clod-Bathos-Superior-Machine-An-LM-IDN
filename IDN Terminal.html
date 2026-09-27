@@ -267,7 +267,7 @@
   .transcript{
     overflow-y:auto;
     overflow-x:hidden;
-    padding: 18px 4px 18px 4px;
+    padding: 18px 12px 18px 12px;                    /* room at the sides for the lines' jitter (lineRoom) */
     scrollbar-width: thin;
     scrollbar-color: var(--amber-dim) transparent;
   }
@@ -416,7 +416,7 @@
 
   /* loading screen — the first click/keypress unlocks audio (autoplay policy) */
   .loader{
-    position:fixed; inset:0; z-index:20;
+    position:fixed; inset:0; z-index:20; overflow:auto;
     background: radial-gradient(ellipse at center, var(--screen-1) 0%, var(--bg) 70%);
     color:var(--amber);
     display:flex; align-items:center; justify-content:center; text-align:center;
@@ -446,7 +446,7 @@
      BLUE sky (the bio site's --brand-blue) over a faint green field. Colours
      come from the RELEASE palette in :root. */
   .release{
-    position:fixed; inset:0; z-index:21; display:none;
+    position:fixed; inset:0; z-index:21; display:none; overflow:auto;
     background: radial-gradient(ellipse at 50% 36%, var(--release-sky-0) 0%, var(--release-sky-1) 48%, var(--release-sky-2) 100%);
     color:var(--release-ink-2);
     align-items:center; justify-content:center; text-align:center;
@@ -457,7 +457,12 @@
   .release.lit{ opacity:1; }
   .release-field{ position:absolute; left:0; right:0; bottom:0; height:26%;
     background: linear-gradient(to top, rgba(var(--release-field-rgb),.32), rgba(var(--release-field-rgb),0)); }
-  .release-inner{ position:relative; }
+  .release-inner{ position:relative; margin:auto; }
+  /* centred by auto margins (the flex centring these had pushed a tall splash's top and
+     bottom off a short screen, a phone on its side, out of reach) */
+  .loader{ align-items:flex-start; justify-content:flex-start; }
+  .loader-inner{ margin:auto; padding:18px 0; }
+  .release{ align-items:flex-start; justify-content:flex-start; }
   .release-title{ font-size:72px; letter-spacing:.18em; color:var(--release-ink); }
   .release-sub{ font-size:22px; margin-top:8px; letter-spacing:.12em; color:var(--release-ink-2); }
   .release-prompt{ margin-top:54px; font-size:24px; animation: promptblink 1.1s steps(1) infinite; }
@@ -526,6 +531,11 @@
   }
 
   @media (max-width: 640px){
+    /* a softer vignette: on a narrow screen the text runs close to its dark corners */
+    .screen::after{ background:
+      radial-gradient(ellipse at center, transparent 72%, rgba(0,0,0,.35) 100%),
+      radial-gradient(ellipse at 50% 0%, rgba(255,210,120,.06), transparent 60%); }
+    .screen-wrap{ border-radius:0; }          /* the phone's own corners are round enough */
     /* a phone: the notch and the home bar keep their margins (viewport-fit=cover) */
     .content{font-size:18px;
       padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));}
@@ -533,7 +543,7 @@
     .statusbar .left, .statusbar .right{gap:10px}
     .statusbar .ver, #date{display:none}      /* the version and the date: no room, and nothing lost */
     .promptbar input{font-size:18px}          /* 16px or more, or iOS zooms the page on focus */
-    .transcript{padding-right:12px}           /* room for a line's sideways jitter, which clipped its last letter */
+    .transcript{padding-left:8px; padding-right:12px}   /* room for a line's sideways jitter (lineRoom), which clipped its letters */
     .boot{font-size:15px; padding:18px 14px; white-space:pre-wrap}
     .loader-inner{padding:0 18px}
     .loader-title, .release-title{font-size:44px; letter-spacing:.12em}
@@ -557,11 +567,11 @@
 <script>
   if (window.MH_TITLE_CARD) window.MH_TITLE_CARD.show({
     colour: "#9a4310",                                     // burnt orange (the bio site's --flare-strong): each work's card has its own
-    kicker: "This interactive digital narrative is presented",
+    kicker: "Interactive digital narrative",
     mark: "LM",
     title: "Clod Bathos, Superior Machine",
-    particulars: "Implementation: HTML and JavaScript around a deterministic state machine. Dialogue: SmolLM2-1.7B-Instruct (q4f16) through WebLLM, on WebGPU. Speech to text: Whisper base.en through transformers.js. Text to speech: SAM.\nRuntime: Chrome or Edge on a computer with WebGPU, about 1 GB downloaded once. Elsewhere, and on a phone, the story plays in its written lines.",
-    text: ["I created Clod Bathos as an experiment in the use of small language models to drive game dialogue. Two models are involved: a language model for driving the game’s state machine as you input your dialogue decisions, and a speech-recognition model for speech to text. The game’s text to speech is SAM, a small software speech synthesizer. The character of Clod Bathos is, evidently, modeled on today’s ‘frontier’ chatbots, my premise being that some of Bathos’s ethical tuning has gone awry in the years it has been left socially abandoned."],
+    particulars: "Implementation: HTML and JavaScript around a deterministic state machine. Dialogue: SmolLM2-1.7B-Instruct (q4f16) through WebLLM, on WebGPU. Speech-to-text: Whisper base.en through transformers.js. Text-to-speech: SAM.\nRuntime: Chrome or Edge on a computer with WebGPU, about 1 GB downloaded once. Elsewhere, and on a phone, the story plays in its written lines.",
+    text: ["I created Clod Bathos as an experiment in the use of small language models to drive game dialogue. Two models are involved: a language model for driving the game’s state machine as you input your dialogue decisions, and a speech-recognition model for speech-to-text. The game’s text-to-speech is SAM, a small software speech synthesizer. The character of Clod Bathos is, evidently, modeled on today’s ‘frontier’ chatbots, my premise being that some of Bathos’s ethical tuning has gone awry in the years it has been left socially abandoned."],
     by: "By",
     author: "M. Reid Horrigan",
     left: "matthorrigan.com",
@@ -572,7 +582,7 @@
     // do in French mode, or by the card's own switch. The game itself is in English,
     // and the French card says so in the strip along its box.
     fr: {
-      kicker: "Ce récit numérique interactif est présenté",
+      kicker: "Récit numérique interactif",
       particulars: "Réalisation\u00A0: HTML et JavaScript autour d'une machine à états déterministe. Dialogue\u00A0: SmolLM2-1.7B-Instruct (q4f16) par WebLLM, sur WebGPU. Reconnaissance vocale\u00A0: Whisper base.en par transformers.js. Synthèse vocale\u00A0: SAM.\nExécution\u00A0: Chrome ou Edge sur un ordinateur doté de WebGPU, environ 1\u00A0Go téléchargé une fois. Ailleurs, et sur téléphone, l'histoire se joue avec ses répliques écrites.",
       note: "Le jeu lui-même est en anglais.",
       text: ["J'ai créé Clod Bathos comme une expérience sur l'usage de petits modèles de langage pour piloter le dialogue d'un jeu. Deux modèles y interviennent\u00A0: un modèle de langage pilote la machine à états du jeu à mesure que vous saisissez vos choix de dialogue, et un modèle de reconnaissance vocale transcrit la parole. La synthèse vocale du jeu, elle, est assurée par SAM, un petit synthétiseur vocal logiciel. Le personnage de Clod Bathos est, de toute évidence, calqué sur les agents conversationnels «\u00A0de pointe\u00A0» d'aujourd'hui, mon postulat étant qu'une partie du réglage éthique de Bathos a déraillé au fil de ses années d'abandon social."],
@@ -1012,7 +1022,8 @@ function r(n){ return (Math.random()*2 - 1) * n; }
 
 function applyRaggedness(el, opts = {}){
   const amp = (opts.amp ?? 1) * (1 + glitch.level * 1.5);
-  el.style.setProperty('--jx', r(4 * amp) + 'px');
+  // sideways no further than the transcript's margin on that side allows (a phone's is small)
+  el.style.setProperty('--jx', clampTo(r(4 * amp), lineRoom()) + 'px');
   el.style.setProperty('--ji', (Math.random() * 12 * amp) + 'px');
   // NOTE: no per-line vertical or rotation jitter — vertical motion is avoided
   // entirely. Only horizontal motion anywhere in the UI.
@@ -1206,7 +1217,7 @@ function addSeparator(){
   const el = document.createElement('div');
   el.className = 'turn-rule';
   el.setAttribute('aria-hidden', 'true');           // a rule, not words
-  el.style.setProperty('--jx', r(8) + 'px');
+  el.style.setProperty('--jx', clampTo(r(8), lineRoom()) + 'px');
   transcript.appendChild(el);                       // in the page first, so it has a width to fill
   raggedSeparator(el);
 }
@@ -1657,6 +1668,28 @@ tick(); setInterval(tick, 1000);
  *    All effects are short, additive, and self-clearing.
  * ===========================================================================*/
 
+/* The glitches move the terminal sideways, and must not carry its text off the glass: a
+ * phone's side margin is 14px, and a tear shifted the whole terminal by up to 16 (29 in
+ * a burst) and a skew sheared its top and bottom by more. So every sideways move is kept
+ * within the margin, measured as it is (desktop keeps its old range; a phone, gentler). */
+function sideRoom(){
+  const pad = parseFloat(getComputedStyle(content).paddingLeft) || 16;
+  return Math.max(2, pad - 3);
+}
+/** The steepest skew that keeps the top and bottom within `room` pixels of where they were. */
+function maxSkewDeg(room){
+  const half = (content.clientHeight || 600) / 2;
+  return Math.atan(Math.max(0, room) / half) * 180 / Math.PI;
+}
+function clampTo(v, lim){ return Math.max(-lim, Math.min(lim, v)); }   // a declaration: the line jitter above uses it too
+/** How far a line of the transcript may jitter sideways: the transcript's own margin, less a pixel. */
+function lineRoom(){
+  const t = document.getElementById('transcript');
+  if (!t) return 3;
+  const cs = getComputedStyle(t);
+  return Math.max(1, Math.min(parseFloat(cs.paddingLeft) || 4, parseFloat(cs.paddingRight) || 4) - 1);
+}
+
 function tearOnce(){
   const screenH = screen.clientHeight;
   const y = Math.floor(Math.random() * screenH);
@@ -1664,9 +1697,11 @@ function tearOnce(){
   document.documentElement.style.setProperty('--tear-x', dx + 'px');
   document.documentElement.style.setProperty('--tear-y', y + 'px');
 
-  // briefly translateX the entire content
+  // briefly translateX the entire content, as far as its margin allows, and shear it with what is left
+  const room = sideRoom(), tx = clampTo(dx * 0.4, room * 0.6);
+  const sk = clampTo(r(1.5) * glitch.level, maxSkewDeg(room - Math.abs(tx)));
   const prev = content.style.transform;
-  content.style.transform = `translateX(${dx*0.4}px) skewX(${r(1.5)*glitch.level}deg)`;
+  content.style.transform = `translateX(${tx}px) skewX(${sk}deg)`;
   setTimeout(() => { content.style.transform = prev; }, 70 + Math.random()*120);
 }
 
@@ -1690,7 +1725,7 @@ function chromaOnce(){
 }
 
 function skewOnce(){
-  const s = r(2.2) * glitch.level;
+  const s = clampTo(r(2.2) * glitch.level, maxSkewDeg(sideRoom()));   // its top and bottom stay on the glass
   document.documentElement.style.setProperty('--skew', s + 'deg');
   setTimeout(() => {
     document.documentElement.style.setProperty('--skew', '0deg');

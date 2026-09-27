@@ -102,6 +102,18 @@ const cardTop = await evalIn("(() => { const c = document.querySelector('.mhtc')
 console.log("the title card's top: " + (cardTop >= 0 ? "in reach (" + cardTop + " px)" : "cut off above the screen NO (" + cardTop + " px)")); if (!(cardTop >= 0)) bad++;
 const cardColour = await evalIn("document.querySelector('.mhtc').style.getPropertyValue('--mhtc-c')");
 console.log("the title card's colour: " + cardColour + (cardColour === "rgb(154,67,16)" ? " (its own burnt orange)" : " NO"));  if (cardColour !== "rgb(154,67,16)") bad++;
+// a long transcript: the column shows, its thumb at the foot when scrolled to the end, at the head when scrolled to the top.
+// Checked before the game starts (the opening, typing, scrolls the transcript to its newest line), and cleared after.
+const col = JSON.parse(await evalIn(`(async () => { for (let i = 0; i < 40; i++) addLine('line ' + i + ' of a long petition', 'sys');
+  const t = document.getElementById('transcript'), bar = document.querySelector('.glyph-scroll'), wait = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  // the opening may still be typing, so "the end" moves: scroll there again until it holds
+  for (let k = 0; k < 20; k++) { t.scrollTop = t.scrollHeight; await wait(); if (t.scrollTop + t.clientHeight >= t.scrollHeight - 2) break; }
+  const end = bar.hidden ? '' : bar.textContent.split('\\n');
+  t.scrollTop = 0; await wait(); const top = bar.hidden ? '' : bar.textContent.split('\\n');
+  const out = JSON.stringify({ end: end && end.join(''), endFoot: end && end[end.length - 1] === '█', topHead: top && top[0] === '█' });
+  t.replaceChildren(); await wait(); return out; })()`));
+const colOk = col.endFoot && col.topHead;
+console.log("a long transcript: the column shows (" + (col.end || "").slice(0, 20) + "…), thumb at the foot at the end, at the head at the top: " + (colOk ? "yes" : "NO " + JSON.stringify(col))); if (!colOk) bad++;
 // in French: the card's own switch turns it over (the address takes ?lang=fr), and the
 // card says the game itself is in English; a load with ?lang=fr opens it in French
 const fr = async (how) => {
@@ -109,7 +121,7 @@ const fr = async (how) => {
     kicker: document.querySelector('.mhtc-kicker').textContent, go: document.querySelector('.mhtc-go').textContent,
     strip: document.querySelector('.mhtc-strip').hidden ? '' : document.querySelector('.mhtc-strip').textContent,
     url: location.search })`));
-  const ok = r.lang === "fr" && /^Ce /.test(r.kicker) && r.go === "Commencer" && /anglais/.test(r.strip) && /lang=fr/.test(r.url);
+  const ok = r.lang === "fr" && /^Récit/.test(r.kicker) && r.go === "Commencer" && /anglais/.test(r.strip) && /lang=fr/.test(r.url);
   console.log("French card, " + how + ": " + (ok ? "yes (\"" + r.strip + "\")" : "NO " + JSON.stringify(r))); if (!ok) bad++;
 };
 await evalIn("document.querySelector('.mhtc-lang').click(), true");
@@ -166,16 +178,26 @@ const micOk = chars.micBorder === "none" && chars.micRound === "0px" && /\[/.tes
 console.log("the mic in characters: " + chars.micBefore + chars.micGlyph + (micOk ? "" : " NO (" + chars.micBorder + ", " + chars.micRound + ")")); if (!micOk) bad++;
 const barOk = chars.scrollbar === "none" && (chars.over > 2 ? /█/.test(chars.bar) && /┊/.test(chars.bar) : chars.bar === "hidden");
 console.log("the scrollbar in characters: native " + chars.scrollbar + ", " + (chars.over > 2 ? "the transcript overflows, and the column reads " + chars.bar.slice(0, 24) + "…" : "no overflow, the column hidden") + (barOk ? "" : " NO")); if (!barOk) bad++;
-// a long transcript: the column shows, its thumb at the foot when scrolled to the end, at the head when scrolled to the top
-const col = JSON.parse(await evalIn(`(async () => { for (let i = 0; i < 40; i++) addLine('line ' + i + ' of a long petition', 'sys');
-  const t = document.getElementById('transcript'), bar = document.querySelector('.glyph-scroll'), wait = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-  // the opening may still be typing, so "the end" moves: scroll there again until it holds
-  for (let k = 0; k < 20; k++) { t.scrollTop = t.scrollHeight; await wait(); if (t.scrollTop + t.clientHeight >= t.scrollHeight - 2) break; }
-  const end = bar.hidden ? '' : bar.textContent.split('\\n');
-  t.scrollTop = 0; await wait(); const top = bar.hidden ? '' : bar.textContent.split('\\n');
-  return JSON.stringify({ end: end && end.join(''), endFoot: end && end[end.length - 1] === '█', topHead: top && top[0] === '█' }); })()`));
-const colOk = col.endFoot && col.topHead;
-console.log("a long transcript: the column shows (" + (col.end || "").slice(0, 20) + "…), thumb at the foot at the end, at the head at the top: " + (colOk ? "yes" : "NO " + JSON.stringify(col))); if (!colOk) bad++;
+
+// the glitches keep the terminal on the glass: at full burst strength, many tears and skews,
+// each measured as it happens, and nothing may leave the screen (or a line its transcript)
+const clip = JSON.parse(await evalIn(`(() => {
+  const was = glitch.level; glitch.set({ level: 1.4 });
+  const wrap = document.querySelector('.screen-wrap').getBoundingClientRect(), t = document.getElementById('transcript');
+  const parts = () => [...document.querySelectorAll('#statusbar .left > *, #statusbar .right > *, .glyph-rule, #input, #micbtn.available')];
+  let worst = 0, where = '', n = 0;
+  const look = () => {
+    n++;
+    for (const el of parts()) { const r = el.getBoundingClientRect(); const o = Math.max(wrap.left - r.left, r.right - wrap.right); if (o > worst) { worst = o; where = el.id || el.className; } }
+    const tr = t.getBoundingClientRect();
+    for (const el of t.querySelectorAll('.line')) { const r = el.getBoundingClientRect(); if (r.bottom < tr.top || r.top > tr.bottom) continue; const o = Math.max(tr.left - r.left, r.right - tr.right) - 1; if (o > worst) { worst = o; where = 'a line'; } }
+  };
+  for (let i = 0; i < 150; i++) { tearOnce(); look(); skewOnce(); look(); jitterLinesOnce(); look(); }
+  glitch.set({ level: was });
+  return JSON.stringify({ worst: Math.round(worst * 10) / 10, where, n });
+})()`));
+const clipOk = clip.worst <= 0.5;
+console.log("glitches at full strength (" + clip.n + " looks): " + (clipOk ? "nothing leaves the glass" : "the " + clip.where + " goes " + clip.worst + " px past it NO")); if (!clipOk) bad++;
 await sleep(1300);
 const r2 = JSON.parse(await evalIn(RULES)), churned = r2.top.text !== r1.top.text || r2.bottom.text !== r1.bottom.text;
 console.log("the rules churn: " + (churned ? "yes" : "NO")); if (!churned) bad++;
@@ -188,6 +210,18 @@ check("prompt bar", await fit("#promptbar, #input, #micbtn"));
 check("terminal lines", await fit("#transcript, #transcript > *"));
 console.log("status bar: " + await text("#statusbar"));
 console.log("the terminal: " + ((await text("#transcript > *")) || "(empty)").slice(0, 400));
+// a phone on its side (740 by 360): the splash centres when it fits and scrolls when it does
+// not, its top and its foot both in reach (flex-centred, they had run off the screen)
+await send("Emulation.setDeviceMetricsOverride", { width: 740, height: 360, deviceScaleFactor: 3, mobile: true }, sessionId);
+await evalIn("location.reload(), true");
+for (let i = 0; i < 40; i++) { await sleep(250); if (await evalIn("document.readyState === 'complete' && !!document.querySelector('.loader-inner')")) break; }
+await sleep(500);
+const side = JSON.parse(await evalIn(`(() => { const l = document.getElementById('loader'), inner = l.querySelector('.loader-inner'); l.scrollTop = 0;
+  const a = inner.getBoundingClientRect(); l.scrollTop = l.scrollHeight; const b = inner.getBoundingClientRect();
+  return JSON.stringify({ top: Math.round(a.top), foot: Math.round(b.bottom), h: innerHeight }); })()`));
+const sideOk = side.top >= 0 && side.foot <= side.h;
+console.log("a phone on its side, the splash: its top " + (side.top >= 0 ? "in reach" : "cut off NO") + ", its foot " + (side.foot <= side.h ? "in reach" : "cut off NO")); if (!sideOk) bad++;
+await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 3, mobile: true }, sessionId);
 // with reduced motion, the rules hold still
 await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] }, sessionId);
 await evalIn("location.reload(), true");

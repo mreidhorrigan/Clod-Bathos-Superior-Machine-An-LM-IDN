@@ -29,8 +29,8 @@
 
    MH_TITLE_CARD.show({
      id,                on this site: the card's name in i18n-fr.js ("rockwalls")
-     kicker,            the line above the box ("This interactive digital narrative
-                        is presented"), set in capitals as the by-line and name are
+     kicker,            the line above the box: what the work is ("Interactive digital
+                        narrative"), set in capitals as the by-line and name are
      mark,              the box's large letters (the kind of work: "LM")
      title,             the work's title, first in the box
      particulars,       the box's small lines after the title: the specs, a line
