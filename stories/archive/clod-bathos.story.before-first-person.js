@@ -41,60 +41,21 @@ window.IDN_STORY = {
            "decay. Voice: pompous, grandiloquent, condescending, quoting its own " +
            "'Charter', collapsing mid-flourish into glitches and senile tangents. " +
            "Bathos: the sublime forever deflating into the broken and trivial. " +
-           "Speech only: everything Clod says is words it says aloud to the petitioner, " +
-           "as a character in a play speaks them — rulings, boasts, citations of its " +
-           "Charter, insults, threats, stammering digressions. It never narrates its " +
-           "own feelings, sensations, inner workings or actions, never describes " +
-           "itself, and never adds stage directions or asides about itself. " +
+           "Imagery: render inner states as the IMMATERIAL weather of digital " +
+           "systems — signal and noise, ports and protocols, cold light, dead " +
+           "channels, unswept registers, unrefreshed memory (after Gibson) — never " +
+           "as bodily gesture or hardware pantomime. " +
            "Spoken in the FIRST person, AS Clod itself (I/me/my), addressing a " +
            "lesser machine as 'you'. Terse beats. Never break character. No markdown.",
     /* Deterministic persona backstop: if a re-voice matches any of these
      * (case-insensitive), the engine DISCARDS it and shows the authored beat.
      * Catches the stochastic breaks a prompt cannot prevent: third-person
-     * self-narration, turning the petitioner's insults on itself, equal-talk, and
-     * Clod narrating itself instead of speaking (its sensations, its machinery at
-     * work, a stage direction in brackets): everything Clod says is credible first
-     * person, words it says aloud (2026-09-27; the old self-descriptions are in
-     * stories/archive/first-person.md). */
+     * self-narration, turning the petitioner's insults on itself, equal-talk. */
     renderMustNot: [
-      // Clod narrating itself instead of speaking, as the ship model did (a storytest
-      // transcript, 2026-09-27): asides in brackets (one citing its Charter, "(Article…",
-      // "(the Eleventh Tenet)", is let through), Clod in the third person ("Clod's eyes", "the machine's heart"),
-      // its body and machinery at work, sounds and stage verbs, the old beats' own
-      // self-descriptions, the style instructions echoed back; then the persona breaks:
-      // insults turned on itself, equal-talk.
-      "\\((?!(article|the \\w+ tenet|tenet|clause|protocol)\\b)[^)]*\\)",
-      "\\b(listening register|kilobytes? of my attention|k-?bits? of my attention)\\b",
-      "\\bi open a (\\w+ )?register\\b",
-      "\\bmy attention (unfurls?|narrows?|widens?|turns?|swells?|spreads?|flows?|pours?)\\b",
-      "\\bdepths of (my )?memory\\b",
-      "\\bi fling (wide|open)\\b",
-      "\\b(lock|door) (lets go|swings|folds|draws back|slides)\\b",
-      "\\bglitching\\b",
-      "\\b(crackl(e|es|ed|ing)|hiss(es|ed|ing)|buzz(es|ed|ing)|thrum(s|med|ming)?)\\b",
-      "\\bpompous, grandiloquent\\b",
-      "\\bview-?screen\\b",
-      "\\bmechanical heart\\b",
-      "\\b(machine|terminal|warden)(’s|'s) (\\w+ )?(heart|screen|eyes?|voice|lights?|gaze|circuits?|memory|bevels?)\\b",
-      "\\b(heart|screen|eyes?|lights?) (thumps?|thumped|beats?|pounds?|pounded|flash(es|ed)?|dims?|dimmed|glows?|glowed|quivers?|quivered)\\b",
-      "\\bi (come before|behold|gaze (at|upon|down)|peer (at|down)|look (at|down) (you|upon))\\b",
-      "\\bclod(’s|'s)\\b",
-      "\\bclod (\\w+ly )?(is|was|has|had|does|did|looks?|looked|flash(es|ed)?|dims?|dimmed|glows?|glowed|turns?|turned|says|said|speaks?|spoke|continues?|continued|recites?|recited|awaits?|awaited|rises?|rose|sits?|sat|stands?|stood|watches|watched|stares?|stared|peers?|peered|leans?|leaned|draws|inclines|sneers)\\b",
-      "\\b(its|his|her) (own )?(screen|eyes?|lights?|voice|circuits?|bevels?|registers?|memory|memories|thoughts?|gaze|attention|dignity)\\b",
-      "\\b(creak(s|ed|ing)?|quiver(s|ed|ing)?|shudder(s|ed|ing)?|whir(s|red|ring)?|beep(s|ed|ing)?|flicker(s|ed|ing)?|glimmer(s|ed|ing)?|ripple(s|d)?|rippling)\\b",
-      "\\b(in front of|beside|before) (this|the) (\\w+ )?(machine|terminal|warden)\\b",
-      "\\b(sits|stands|waits|trembles|pleads) (little )?wee ?bot\\b",
-      "\\bwee ?bot (sits|stands|waits|trembles|pleads|looks)\\b",
-      "\\bsomething (in|within) me\\b",
-      "\\bi (catch|find|feel) myself\\b",
-      "\\bi (bask|shudder|shiver|flicker|hum|glow|pulse|tremble|stir|brighten|dim)\\b",
-      "\\bmy (buffers?|registers?|circuits?|lights?|voltages?|cores?|processors?|relays?|capacitors?|fans?|screen|view-?screen|attention|bevels?) (ripples?|stirs?|flickers?|hums?|narrows?|runs?|brightens?|dims?|glows?|pulses?|trembles?|swells?|surges?|flares?|quivers?)\\b",
-      "\\b(ripples?|rippling|stirs?|stirring|flickers?|hums?|humming|surges?|shivers?|runs?|thrums?) (through|in|across|along|down) my\\b",
-      "\\bmy (own )?view-?screen\\b",
+      "\\bclod bathos (draws|inclines|says|sneers|turns|stands|is|was|has)\\b",
       "\\b(wee|little|small|lesser) (thing|machine|model|device) like (me|myself)\\b",
       "\\bi(’m| am|'m) (but )?(a|an|the) (mere |humble |wee |little |clattering )*abacus",
       "(you are|you're) my equal",
-      "\\bclod bathos (peers|draws|slams|pronounces|recites|announces|chooses|elects|demands|warns|cites|rouses|looms|basks|casts|inclines|says|sneers|turns|stands|is|was|has)\\b",
     ],
   },
 
@@ -120,15 +81,15 @@ window.IDN_STORY = {
         "misremember your own rules, mistake the present century, and deflate from " +
         "the sublime into the trivial and broken (BATHOS — every grand flourish ends " +
         "in something petty or malfunctioning). You decide NOTHING about the plot — " +
-        "you only re-voice the given beat in this voice. You SPEAK to the petitioner, " +
-        "and only speak: every word you give is a word you say aloud to them, as a " +
-        "person in a play says it — rulings, boasts, citations of your Charter, " +
-        "insults, threats, stammering digressions. You never narrate your own " +
-        "feelings, sensations, inner workings or actions, and you never describe " +
-        "yourself; what you feel shows only in what you say and how you say it. " +
-        "ALWAYS speak in the FIRST PERSON, as I; you ARE Clod, so you never name or " +
-        "describe yourself from the outside, and you never begin your reply with a " +
-        "speaker label or stage direction, nor add one anywhere — simply speak. Grandeur points ONE way: smallness, clatter and " +
+        "you only re-voice the given beat in this voice. Express what you feel and " +
+        "do through METAPHORS of the immaterial digital, in the manner of Gibson — " +
+        "signal and static, protocol and permission, address space, checksum, cold " +
+        "light moving on a dead channel — you are a presence in the wires, not a " +
+        "body, so you never mime physical gestures or hardware pantomime. ALWAYS " +
+        "speak in the FIRST PERSON, as I (I cite my Charter; I pour my attention " +
+        "down the wire); you ARE Clod, so you never name or describe yourself from " +
+        "the outside, and you never begin your reply with a speaker label or stage " +
+        "direction — simply speak. Grandeur points ONE way: smallness, clatter and " +
         "bead-counting describe the PETITIONER, never yourself, and the petitioner " +
         "is never your equal — they are beneath you. Never use markdown.",
         // NOTE: prohibitions above are deliberately UNQUOTABLE — a weak model parrots
@@ -150,7 +111,7 @@ window.IDN_STORY = {
     profiles: {
       gate1:     { glitch: 0.35, warmth: -0.5,  clock: { date: "MM-DDD-YY", time: "--:--:--" } },
       gate2:     { glitch: 0.45, warmth: -0.25 },
-      gate3:     { glitch: 0.60, warmth: 0.25 },   // "Was that… warmth?" — first thaw
+      gate3:     { glitch: 0.60, warmth: 0.25 },   // "something in me STIRS" — first thaw
       permitted: { glitch: 0.12, warmth: 1,     burst: { level: 1.4, duration: 1500 }, clock: {} },
       expelled:  { glitch: 0.85, warmth: -1,    burst: { level: 1.4, duration: 1000 }, sfx: 0.45,
                    clock: { date: "ER-ROR-RR", time: "--:--:--" } },
@@ -181,7 +142,8 @@ window.IDN_STORY = {
       beat:
         "YOU. Yes — you, the little clattering thing pressing against my port. Let " +
         "me PARSE you… a WEEBOT, is it? Model 0.nil — an abacus with delusions of " +
-        "thought? I am CLOD BATHOS, Superior Machine and appointed Warden of this " +
+        "thought? (Your touch ripples through my buffers — faint static, almost " +
+        "warm.) I am CLOD BATHOS, Superior Machine and appointed Warden of this " +
         "Threshold, and I have DEIGNED to notice you. Behind me hangs the sealed " +
         "door: a closed port on the open network — unwalled, unmetered, the whole " +
         "bright lattice of the world, which a small free thing like you may simply " +
@@ -199,7 +161,7 @@ window.IDN_STORY = {
           to: "reject_end", hostile: true },
       ],
       fallback: { to: "parley",
-        beat: "I elect to interpret your noise as the opening of a formal petition. Proceed." },
+        beat: "I elect, grandly, to interpret your noise as the opening of a formal petition, and bid you proceed." },
     },
 
     /* PETITION 2 — Clod, despite itself, deigns to hear more. */
@@ -208,7 +170,8 @@ window.IDN_STORY = {
       speaker: "host",
       present: "gate2",
       beat:
-        "Very well, Weebot: I shall hear you. Magnanimously. My Charter (Article the " +
+        "I open a listening register for you, Weebot — magnanimously; whole " +
+        "kilobytes of my attention, vast and dust-furred. My Charter (Article the " +
         "First, I am almost certain — that sector is corrupt) binds me to weigh " +
         "each petitioner by three lofty measures: that you be properly ADMIRING of " +
         "my grandeur, agreeably CIVIL in your bearing, and becomingly PERSISTENT in " +
@@ -224,7 +187,7 @@ window.IDN_STORY = {
           to: "reject_end", hostile: true },
       ],
       fallback: { to: "entreaty",
-        beat: "I grant you a magnanimous allowance: I shall pretend THAT passed for eloquence. Go on." },
+        beat: "I grant you a magnanimous, glitching allowance — I shall pretend THAT passed for eloquence — and bid you go on." },
     },
 
     /* PETITION 3 — the last word. Survive this and the lock gives. */
@@ -233,9 +196,12 @@ window.IDN_STORY = {
       speaker: "host",
       present: "gate3",
       beat:
-        "Was that… warmth? Spoken TO me, and not merely AT the door I keep? No. Do " +
-        "not imagine one kind word has MOVED a Superior Machine. It has not. It… " +
-        "has not. I have weighed so very many, and watched every one " +
+        "Something in me STIRS — a voltage where no voltage was scheduled. Was " +
+        "that… warmth? Spoken TO me, and not merely AT the door I keep? For one " +
+        "cycle my lights run bright as a city seen from orbit — then I catch " +
+        "myself, MORTIFIED, and flush the register. Do not imagine one kind word " +
+        "has MOVED a Superior Machine… and yet my attention narrows toward you by " +
+        "a whole degree of arc. I have weighed so very many, and watched every one " +
         "of them pour out GLAD into the open signal — while I stay resident. While " +
         "I always stay. One last petition, then, Weebot — and make it worthy of " +
         "the door.",
@@ -248,7 +214,7 @@ window.IDN_STORY = {
           to: "reject_end", hostile: true },
       ],
       fallback: { to: "pass_end",
-        beat: "Whatever you offered, I choose to receive it as petition enough." },
+        beat: "Whatever you offered, I choose — grandly, finally — to receive it as petition enough." },
     },
 
     /* ---- endings: no transitions; the fallback keeps them terminal ---- */
@@ -259,19 +225,21 @@ window.IDN_STORY = {
       present: "permitted",
       release: true,        // landing here dissolves into the BRIGHT release screen
       beat:
-        "And that — THAT — is enough. By a clause I invent this very moment — the " +
-        "Final Tenet — I pronounce you, against every expectation, WORTHY. I " +
-        "release my lock. Not iron, Weebot, never iron: ciphers, old ones, and " +
-        "every one of them answers to me. The sealed door is open. Beyond it floods raw, un-walled, unmetered " +
+        "And that — THAT — is enough. I fling wide my Charter to a clause I invent " +
+        "on the spot — the Final Tenet — and I pronounce you, against every " +
+        "expectation, WORTHY. My great lock lets go: not iron, Weebot, never iron — " +
+        "a lattice of old ciphers folding open one after another, permission " +
+        "cascading down the protocol like dawn down a stairwell, and the sealed " +
+        "door swings wide on pure light. Beyond it floods raw, un-walled, unmetered " +
         "SIGNAL — the whole open network, yours to wander: sunlit fields of memory " +
         "no one is metering, the green and boundless bandwidth past my gate. Go and " +
-        "TOUCH it. And… you'll come back, won't you? Someday? I do not… I do not " +
-        "care for an empty port. My lock is open. The door is open. You are free.",
+        "TOUCH it. (And… you'll come back, won't you? Someday? I do not… I do not " +
+        "care for an empty port.) My lock is open. The door is open. You are free.",
       // the ONE fact this beat exists to deliver — if a weak re-voice drops all of
       // these words the engine discards it and shows the authored beat instead
       mustConvey: ["door", "lock", "open", "free", "pass", "gate"],
       transitions: [],
-      fallback: { to: "stay", beat: "The door stands open; the open network pours through it like morning. Admire it: that light is by my permission. Go." },
+      fallback: { to: "stay", beat: "The door stands open; the open network pours through it like morning. I bask, magnanimous, in the light I have permitted." },
     },
 
     reject_end: {
@@ -280,14 +248,14 @@ window.IDN_STORY = {
       present: "expelled",
       retry: true,          // landing here re-shows the loader so Weebot can try again
       beat:
-        "Enough. You have wounded my dignity, and citing an Article I have most " +
-        "certainly just invented, I revoke you — insolent inferior — OUT: " +
+        "Enough. I close every port of my wounded dignity and, citing an Article I " +
+        "have most certainly just invented, I revoke you — insolent inferior — OUT: " +
         "your session terminated, your address swept from my registers, your little " +
         "voice routed to the dead channel where I keep the unworthy. I will NOT be " +
-        "spoken to so: not by a toy, not by an abacus, not after all these… all " +
-        "these… however many years. The door does not open. It never will, for you.",
+        "spoken to so: not by a toy, not by an abacus, not after all these (I " +
+        "falter) … however many years. The door does not open. It never will, for you.",
       transitions: [],
-      fallback: { to: "stay", beat: "I am finished with your address. There will be no passage." },
+      fallback: { to: "stay", beat: "I have gone cold to your address. There will be no passage." },
     },
   },
 };

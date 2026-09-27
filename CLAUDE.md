@@ -11,6 +11,21 @@ active goal: easy/browser-side delivery) — read it first if you're picking thi
 
 ---
 
+## Standing rules (from M., 2026-09-27)
+
+- **Every visual interface element is drawn in characters**: ASCII and its
+  neighbours (box drawing, blocks, geometric shapes, Misc Technical, mathematical
+  symbols), never CSS shapes. The rules (GLYPH RULES, sets in `GLYPHS`), the
+  narrator's state ◉/○, the mic `[●]` (focus `⟦●⟧`, listening `[◉]`), the scrollbar
+  (a column of ┊ with a █ thumb) all follow it; anything new must too.
+- **Everything Clod says is credible first person**: words it says aloud to the
+  petitioner, as a character in a play speaks them. No narration of its own
+  feelings, sensations, inner workings or actions, no stage directions or asides
+  about itself. The prompts ask for speech only, and `meta.renderMustNot` in each
+  story throws out a re-voiced line that slips (the authored beat shows instead).
+  The old self-descriptions are archived word for word in
+  `stories/archive/first-person.md`.
+
 ## Run / build
 
 - **Default dev run — WebLLM, no Ollama:** `python3 serve.py` → opens `http://localhost:8000/…`.

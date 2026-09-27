@@ -89,6 +89,10 @@ let bad = 0;
 const check = (what, list) => { console.log(what + ": " + (list && list.length ? list.join("; ") + " NO" : "fits")); if (list && list.length) bad++; };
 const text = (sel) => evalIn(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter((e) => getComputedStyle(e).display !== 'none' && !e.hidden).map((e) => e.textContent.trim()).join(' | ')`);
 console.log("Clod Bathos on a phone (390 by 844), " + URL_);
+// the title card is made first thing in the page, ahead of the splash, so the splash is never
+// seen before it (made at the end of the page, it came up a moment after the splash)
+const first = await evalIn("(() => { const c = document.querySelector('.mhtc'), l = document.getElementById('loader'); return !!(c && l && (c.compareDocumentPosition(l) & Node.DOCUMENT_POSITION_FOLLOWING)); })()");
+console.log("the title card comes before the splash: " + (first ? "yes" : "NO")); if (!first) bad++;
 // the title card first: what the work is, then Begin
 const cardSays = await text("#mhtc-title, .mhtc-author");
 console.log("title card: " + (cardSays || "MISSING NO")); if (!cardSays) bad++;
@@ -143,6 +147,28 @@ for (const k of ["top", "bottom"]) {
   console.log("the " + k + " rule: " + r.n + " glyphs, " + r.knots + " in knots, " + (r.over > 0 ? r.over + " px past its edge" : "its end in view") + (ok ? "" : " NO") + ": " + r.text.slice(0, 48) + "…");
   if (!ok) bad++;
 }
+// every visual element in characters (the standing rule): the narrator's state, the mic, the scrollbar
+const chars = JSON.parse(await evalIn(`JSON.stringify((() => {
+  const dot = document.querySelector('#narrator-state .dot'), mic = document.getElementById('micbtn'), t = document.getElementById('transcript'), bar = document.querySelector('.glyph-scroll');
+  const cs = (el, pseudo) => getComputedStyle(el, pseudo || null);
+  return { dot: cs(dot, '::before').content, dotRound: cs(dot).borderTopLeftRadius, micBorder: cs(mic).borderTopStyle, micRound: cs(mic).borderTopLeftRadius,
+    micBefore: cs(mic, '::before').content, micGlyph: cs(mic.querySelector('.mic-glyph'), '::before').content, scrollbar: cs(t).scrollbarWidth,
+    over: t.scrollHeight - t.clientHeight, bar: bar ? (bar.hidden ? 'hidden' : bar.textContent.replace(/\\n/g, '')) : 'missing' };
+})())`));
+const dotOk = /[◉○]/.test(chars.dot) && chars.dotRound === "0px";
+console.log("the narrator's state in characters: " + chars.dot + (dotOk ? "" : " NO (" + chars.dotRound + ")")); if (!dotOk) bad++;
+const micOk = chars.micBorder === "none" && chars.micRound === "0px" && /\[/.test(chars.micBefore) && /●/.test(chars.micGlyph);
+console.log("the mic in characters: " + chars.micBefore + chars.micGlyph + (micOk ? "" : " NO (" + chars.micBorder + ", " + chars.micRound + ")")); if (!micOk) bad++;
+const barOk = chars.scrollbar === "none" && (chars.over > 2 ? /█/.test(chars.bar) && /┊/.test(chars.bar) : chars.bar === "hidden");
+console.log("the scrollbar in characters: native " + chars.scrollbar + ", " + (chars.over > 2 ? "the transcript overflows, and the column reads " + chars.bar.slice(0, 24) + "…" : "no overflow, the column hidden") + (barOk ? "" : " NO")); if (!barOk) bad++;
+// a long transcript: the column shows, its thumb at the foot when scrolled to the end, at the head when scrolled to the top
+const col = JSON.parse(await evalIn(`(async () => { for (let i = 0; i < 40; i++) addLine('line ' + i + ' of a long petition', 'sys');
+  const t = document.getElementById('transcript'), bar = document.querySelector('.glyph-scroll'), wait = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  t.scrollTop = t.scrollHeight; await wait(); const end = bar.hidden ? '' : bar.textContent.split('\\n');
+  t.scrollTop = 0; await wait(); const top = bar.hidden ? '' : bar.textContent.split('\\n');
+  return JSON.stringify({ end: end && end.join(''), endFoot: end && end[end.length - 1] === '█', topHead: top && top[0] === '█' }); })()`));
+const colOk = col.endFoot && col.topHead;
+console.log("a long transcript: the column shows (" + (col.end || "").slice(0, 20) + "…), thumb at the foot at the end, at the head at the top: " + (colOk ? "yes" : "NO")); if (!colOk) bad++;
 await sleep(1300);
 const r2 = JSON.parse(await evalIn(RULES)), churned = r2.top.text !== r1.top.text || r2.bottom.text !== r1.bottom.text;
 console.log("the rules churn: " + (churned ? "yes" : "NO")); if (!churned) bad++;

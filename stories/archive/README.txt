@@ -23,3 +23,12 @@ CONTENTS
         (world params, signals, rules, bindings). Kept here as the alternate/earlier
         story, stored for later rather than deleted.
 </content>
+
+  first-person.md
+        Clod's self-descriptions (sensations, machinery at work, stage directions
+        about itself), taken out of both Clod stories on 2026-09-27 so that
+        everything Clod says is credible first person; kept word for word.
+
+  clod-bathos.story.before-first-person.js
+  clod-bathos.complex.story.before-first-person.js
+        The two Clod stories as they were before that change.

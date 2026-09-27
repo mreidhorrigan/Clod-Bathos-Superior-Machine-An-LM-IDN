@@ -8,6 +8,25 @@ works*; this file is *where things stand* and *what's next*.
 
 ## Current state — newest first (updated 2026-09-26)
 
+### Credible first person; everything in characters; the card before the splash (2026-09-27)
+- Clod no longer describes itself ("your touch ripples through my buffers", "something in
+  me STIRS", "I bask, magnanimous"…): both stories' beats and fallbacks are speech only,
+  and the prompts ask for speech only (the old `style` asked for inner states as "the
+  immaterial weather of digital systems"). `meta.renderMustNot` (32 patterns, tested
+  offline against two saved storytest transcripts: of 31 distinct re-voices it caught the
+  28 that narrated or echoed the old self-descriptions and let through the 3 that were
+  plain speech, and it catches none of the authored lines) throws out a re-voice that
+  narrates. The removed
+  passages: `stories/archive/first-person.md`; the stories before: beside it.
+- Every visual element in characters (a standing rule, CLAUDE.md): the narrator's state
+  ◉/○, the mic `[●]`, a character scrollbar; the native scrollbar hidden.
+- The title card is made first thing in the page (it was made after the engine's nine
+  scripts had loaded, so the splash showed first for a moment).
+- Local models are CPU-heavy on this machine (M., 2026-09-27): prefer offline checks
+  against a saved transcript (`python3 storytest.py --transcript …` once, then test
+  patterns against the file), and unload the model after a run
+  (`curl localhost:11434/api/generate -d '{"model":"smollm2:1.7b","keep_alive":0}'`).
+
 ### Rules drawn in characters (2026-09-27)
 - The horizontal lines (under the status bar, over the prompt, and the separators between
   turns) are ASCII art now: the GLYPH RULES block of `IDN Terminal.html` composes each from

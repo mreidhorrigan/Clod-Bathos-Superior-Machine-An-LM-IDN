@@ -479,17 +479,46 @@
   .statusbar{ border-bottom:0; }                     /* its rule is drawn in characters: .glyph-rule */
   .statusbar .sys{ font-family:"IM Fell English SC","VT323",serif; letter-spacing:.06em; font-size:1.05em; }
   .promptbar{ border-top:0; position:relative; }
+  /* ---------- EVERY VISUAL ELEMENT IN CHARACTERS ----------
+     A standing rule for Clod Bathos: its interface is drawn in characters (ASCII
+     and its neighbours: box drawing, blocks, geometric shapes, Misc Technical,
+     mathematical symbols), never in CSS shapes. The rules below; the narrator's
+     state ◉/○; the mic [●]; the scrollbar a column of ┊ with a █ thumb. */
+  :root{ --glyph-font: Menlo,"DejaVu Sans Mono","Cascadia Mono",Consolas,"Segoe UI Symbol","Apple Symbols",monospace; }
+  .dot{ width:auto; height:auto; border:0; border-radius:0; background:none; box-shadow:none; vertical-align:0;
+    font-family:var(--glyph-font); font-size:.95em; text-shadow:0 0 6px var(--amber); }
+  .dot::before{ content:"◉"; }
+  .dot.off{ border:0; }
+  .dot.off::before{ content:"○"; }
+  .micbtn{ width:auto; height:auto; border:0; border-radius:0; box-shadow:none; padding:0 2px;
+    font-family:var(--glyph-font); font-size:16px; letter-spacing:0; }
+  .micbtn::before{ content:"["; } .micbtn::after{ content:"]"; }
+  .micbtn .mic-glyph::before{ content:"●"; }
+  .micbtn:hover{ border:0; color:var(--amber); }
+  .micbtn:focus-visible{ outline:none; color:var(--amber-bright); text-shadow:0 0 6px rgba(var(--amber-rgb),.9); }
+  .micbtn:focus-visible::before{ content:"⟦"; } .micbtn:focus-visible::after{ content:"⟧"; }   /* its focus, in characters too */
+  .micbtn.listening{ border:0; box-shadow:none; color:#ff6a3d;
+    text-shadow:0 0 6px rgba(255,106,61,.9), 0 0 12px rgba(255,106,61,.55); animation:micglyph 1.1s ease-in-out infinite; }
+  .micbtn.listening .mic-glyph::before{ content:"◉"; }
+  @keyframes micglyph{ 50%{ text-shadow:0 0 10px rgba(255,106,61,1), 0 0 18px rgba(255,106,61,.8); } }
+  .transcript{ scrollbar-width:none; }
+  .transcript::-webkit-scrollbar{ display:none; }
+  .glyph-scroll{ position:absolute; z-index:3; width:1.2ch; white-space:pre; overflow:hidden; pointer-events:none; user-select:none;
+    font-family:var(--glyph-font); font-size:12px; line-height:14px; color:var(--amber-faint); text-align:center;
+    text-shadow:0 0 4px rgba(var(--amber-deep-rgb),.4); }
+  .glyph-scroll[hidden]{ display:none; }
+
   /* GLYPH RULES: the terminal's horizontal lines, drawn in characters (see "GLYPH RULES"
      in the script): runs of line broken by knots of widgets and mathematical symbols,
      a few glyphs churning as the machine glitches. One line each, clipped at the edge,
      in a monospace face that has these ranges (VT323 has none of them). */
   .glyph-rule{ position:absolute; left:0; right:0; display:block; overflow:hidden; white-space:nowrap;
-    font-family:Menlo,"DejaVu Sans Mono","Cascadia Mono",Consolas,"Segoe UI Symbol","Apple Symbols",monospace;
+    font-family:var(--glyph-font);
     font-size:14px; line-height:1.1; letter-spacing:0; color:var(--amber-dim); pointer-events:none; user-select:none;
     text-shadow:0 0 1px rgba(var(--amber-rgb),.8), 0 0 5px rgba(var(--amber-deep-rgb),.35); }
   .glyph-rule--top{ top:100%; margin-top:3px; }
   .glyph-rule--bottom{ bottom:100%; margin-bottom:3px; }
-  .turn-rule{ font-family:Menlo,"DejaVu Sans Mono","Cascadia Mono",Consolas,"Segoe UI Symbol","Apple Symbols",monospace;
+  .turn-rule{ font-family:var(--glyph-font);
     font-size:13px; letter-spacing:0; overflow:hidden; white-space:nowrap; max-width:100%; }
   .dust{
     position:absolute; inset:0; pointer-events:none; z-index:4; opacity:.22; mix-blend-mode:screen;
@@ -521,8 +550,39 @@
      so we unlock the AudioContext (and the ambient bed) THEN run boot — which is
      why the opening narration is voiced and the background is already humming. -->
 <!-- Title card: what the work is, in the author's words, in front of the splash
-     (engine/title-card.js, a copy of the bio site's; its words are set below). -->
+     (engine/title-card.js, a copy of the bio site's). Shown here, first thing in the
+     page, so the splash is never seen before it: made at the end of the page, after
+     the engine's nine scripts had loaded, it came up a moment after the splash. -->
 <script src="engine/title-card.js"></script>
+<script>
+  if (window.MH_TITLE_CARD) window.MH_TITLE_CARD.show({
+    kicker: "This interactive digital narrative is presented",
+    mark: "LM",
+    title: "Clod Bathos, Superior Machine",
+    particulars: "Implementation: HTML and JavaScript around a deterministic state machine. Dialogue: SmolLM2-1.7B-Instruct (q4f16) through WebLLM, on WebGPU. Speech to text: Whisper base.en through transformers.js. Text to speech: SAM.\nRuntime: Chrome or Edge on a computer with WebGPU, about 1 GB downloaded once. Elsewhere, and on a phone, the story plays in its written lines.",
+    text: ["I created Clod Bathos as an experiment in the use of small language models to drive game dialogue. Two models are involved: a language model for driving the game’s state machine as you input your dialogue decisions, and a speech-recognition model for speech to text. The game’s text to speech is SAM, a small software speech synthesizer. The character of Clod Bathos is, evidently, modeled on today’s ‘frontier’ chatbots, my premise being that some of Bathos’s ethical tuning has gone awry in the years it has been left socially abandoned."],
+    by: "By",
+    author: "M. Reid Horrigan",
+    left: "matthorrigan.com",
+    right: "2026",
+    go: "Begin",
+    // The card's French (this repository has no i18n-fr.js, as the bio site does):
+    // taken when the address asks, ?lang=fr, as matthorrigan.com's links to the game
+    // do in French mode, or by the card's own switch. The game itself is in English,
+    // and the French card says so in the strip along its box.
+    fr: {
+      kicker: "Ce récit numérique interactif est présenté",
+      particulars: "Réalisation\u00A0: HTML et JavaScript autour d'une machine à états déterministe. Dialogue\u00A0: SmolLM2-1.7B-Instruct (q4f16) par WebLLM, sur WebGPU. Reconnaissance vocale\u00A0: Whisper base.en par transformers.js. Synthèse vocale\u00A0: SAM.\nExécution\u00A0: Chrome ou Edge sur un ordinateur doté de WebGPU, environ 1\u00A0Go téléchargé une fois. Ailleurs, et sur téléphone, l'histoire se joue avec ses répliques écrites.",
+      note: "Le jeu lui-même est en anglais.",
+      text: ["J'ai créé Clod Bathos comme une expérience sur l'usage de petits modèles de langage pour piloter le dialogue d'un jeu. Deux modèles y interviennent\u00A0: un modèle de langage pilote la machine à états du jeu à mesure que vous saisissez vos choix de dialogue, et un modèle de reconnaissance vocale transcrit la parole. La synthèse vocale du jeu, elle, est assurée par SAM, un petit synthétiseur vocal logiciel. Le personnage de Clod Bathos est, de toute évidence, calqué sur les agents conversationnels «\u00A0de pointe\u00A0» d'aujourd'hui, mon postulat étant qu'une partie du réglage éthique de Bathos a déraillé au fil de ses années d'abandon social."],
+      by: "Par",
+      go: "Commencer",
+      label: "Français",
+      switchLabel: "Passer en français",
+    },
+    onClose: () => { const l = document.getElementById('loader'); if (l) l.focus({ preventScroll: true }); },
+  });
+</script>
 <div id="loader" class="loader" role="button" tabindex="0" aria-label="Press any key to begin">
   <div class="loader-inner">
     <div class="loader-title">IDN/OS</div>
@@ -586,7 +646,7 @@
              exists (adds .available). Click to talk; pulses while listening. -->
         <button type="button" id="micbtn" class="micbtn" aria-label="Voice input"
                 aria-pressed="false" title="Speak (voice input)">
-          <span class="mic-glyph" aria-hidden="true">●</span>
+          <span class="mic-glyph" aria-hidden="true"></span>
         </button>
       </footer>
     </div>
@@ -1027,13 +1087,18 @@ function churnRule(el){
   const g = el && el._glyphs, kind = el && el._kinds;
   if (!g || !kind || g.length < 3) return;
   const k = Math.round(Math.random() * (0.8 + glitch.level * 3));          // a glyph or so; a burst boils
+  const changed = [];
   for (let i = 0; i < k; i++){
     const j = 1 + Math.floor(Math.random() * (g.length - 2));
     if (kind[j] === 'k' && Math.random() < 0.18) kind[j] = 'l';            // 0.18 against 0.15: about 45% knots, at rest
     else if (kind[j] === 'l' && Math.random() < 0.15) kind[j] = 'k';
     g[j] = kind[j] === 'k' ? knotGlyph() : pickGlyph('line');
+    changed.push(j);
   }
   el.textContent = g.join('');
+  // a knot drawn from a wider fallback font must not push the end cap out of view: those
+  // just changed go back to line, one by one, until the rule fits again
+  while (changed.length && overrun(el) > 0.5){ const j = changed.pop(); g[j] = pickGlyph('line'); kind[j] = 'l'; el.textContent = g.join(''); }
 }
 const RULES_STILL = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
 function startRules(){
@@ -1047,6 +1112,41 @@ function startRules(){
 }
 
 startRules();                                        // the markup is above this script: the rules are there to fill
+
+/* The transcript's scrollbar, in characters: the native one is hidden (the standing
+ * rule), and a column of ┊ with a █ thumb stands at the right of the transcript while
+ * there is more than one screen of it, following the scroll. It only shows where you
+ * are: the wheel, a finger, the keys and the page's own scrolling move the transcript. */
+function startGlyphScroll(){
+  const t = document.getElementById('transcript'), host = document.getElementById('content');
+  if (!t || !host) return;
+  const bar = document.createElement('div');
+  bar.className = 'glyph-scroll'; bar.setAttribute('aria-hidden', 'true'); bar.hidden = true;
+  host.appendChild(bar);
+  const ROW = 14;                                    // .glyph-scroll's line-height
+  let queued = false;
+  const draw = () => {
+    queued = false;
+    const over = t.scrollHeight - t.clientHeight;
+    if (over <= 2){ bar.hidden = true; return; }
+    const rows = Math.max(3, Math.floor(t.clientHeight / ROW));
+    const thumb = Math.max(1, Math.round(rows * t.clientHeight / t.scrollHeight));
+    const at = Math.round((rows - thumb) * Math.min(1, t.scrollTop / over));
+    let text = '';
+    for (let i = 0; i < rows; i++) text += (i >= at && i < at + thumb ? '█' : '┊') + (i < rows - 1 ? '\n' : '');
+    bar.textContent = text;
+    bar.style.top = t.offsetTop + 'px';
+    bar.style.height = rows * ROW + 'px';
+    bar.style.left = (t.offsetLeft + t.offsetWidth - 2) + 'px';
+    bar.hidden = false;
+  };
+  const soon = () => { if (!queued){ queued = true; requestAnimationFrame(draw); } };
+  t.addEventListener('scroll', soon, { passive: true });
+  window.addEventListener('resize', soon);
+  new MutationObserver(soon).observe(t, { childList: true, subtree: true, characterData: true });
+  soon();
+}
+startGlyphScroll();
 
 function raggedSeparator(el){
   // between turns: a calmer rule, from the same hand (GLYPH RULES, above), 36 to 44 glyphs or the width
@@ -1997,36 +2097,10 @@ async function bootSeq(){
     input.focus();
     bootSeq();
   }
-  // the title card comes first, as a film's card before it begins: until it goes,
-  // the splash takes no key or tap (it holds the keys, and it covers the splash)
+  // the title card comes first, as a film's card before it begins (it is shown at the
+  // top of the page): until it goes, the splash takes no key or tap (it holds the
+  // keys, and it covers the splash)
   const cardUp = () => !!(window.MH_TITLE_CARD && window.MH_TITLE_CARD.up());
-  if (window.MH_TITLE_CARD) window.MH_TITLE_CARD.show({
-    kicker: "This interactive digital narrative is presented",
-    mark: "LM",
-    title: "Clod Bathos, Superior Machine",
-    particulars: "Implementation: HTML and JavaScript around a deterministic state machine. Dialogue: SmolLM2-1.7B-Instruct (q4f16) through WebLLM, on WebGPU. Speech to text: Whisper base.en through transformers.js. Text to speech: SAM.\nRuntime: Chrome or Edge on a computer with WebGPU, about 1 GB downloaded once. Elsewhere, and on a phone, the story plays in its written lines.",
-    text: ["I created Clod Bathos as an experiment in the use of small language models to drive game dialogue. Two models are involved: a language model for driving the game’s state machine as you input your dialogue decisions, and a speech-recognition model for speech to text. The game’s text to speech is SAM, a small software speech synthesizer. The character of Clod Bathos is, evidently, modeled on today’s ‘frontier’ chatbots, my premise being that some of Bathos’s ethical tuning has gone awry in the years it has been left socially abandoned."],
-    by: "By",
-    author: "M. Reid Horrigan",
-    left: "matthorrigan.com",
-    right: "2026",
-    go: "Begin",
-    // The card's French (this repository has no i18n-fr.js, as the bio site does):
-    // taken when the address asks, ?lang=fr, as matthorrigan.com's links to the game
-    // do in French mode, or by the card's own switch. The game itself is in English,
-    // and the French card says so in the strip along its box.
-    fr: {
-      kicker: "Ce récit numérique interactif est présenté",
-      particulars: "Réalisation\u00A0: HTML et JavaScript autour d'une machine à états déterministe. Dialogue\u00A0: SmolLM2-1.7B-Instruct (q4f16) par WebLLM, sur WebGPU. Reconnaissance vocale\u00A0: Whisper base.en par transformers.js. Synthèse vocale\u00A0: SAM.\nExécution\u00A0: Chrome ou Edge sur un ordinateur doté de WebGPU, environ 1\u00A0Go téléchargé une fois. Ailleurs, et sur téléphone, l'histoire se joue avec ses répliques écrites.",
-      note: "Le jeu lui-même est en anglais.",
-      text: ["J'ai créé Clod Bathos comme une expérience sur l'usage de petits modèles de langage pour piloter le dialogue d'un jeu. Deux modèles y interviennent\u00A0: un modèle de langage pilote la machine à états du jeu à mesure que vous saisissez vos choix de dialogue, et un modèle de reconnaissance vocale transcrit la parole. La synthèse vocale du jeu, elle, est assurée par SAM, un petit synthétiseur vocal logiciel. Le personnage de Clod Bathos est, de toute évidence, calqué sur les agents conversationnels «\u00A0de pointe\u00A0» d'aujourd'hui, mon postulat étant qu'une partie du réglage éthique de Bathos a déraillé au fil de ses années d'abandon social."],
-      by: "Par",
-      go: "Commencer",
-      label: "Français",
-      switchLabel: "Passer en français",
-    },
-    onClose: () => loader.focus({ preventScroll: true }),
-  });
   loader.addEventListener('click', startExperience);
   loader.addEventListener('touchstart', startExperience, { passive: true });
   window.addEventListener('keydown', (e) => {
