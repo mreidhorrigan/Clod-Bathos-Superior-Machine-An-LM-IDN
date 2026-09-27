@@ -8,6 +8,16 @@ works*; this file is *where things stand* and *what's next*.
 
 ## Current state — newest first (updated 2026-09-26)
 
+### Rules drawn in characters (2026-09-27)
+- The horizontal lines (under the status bar, over the prompt, and the separators between
+  turns) are ASCII art now: the GLYPH RULES block of `IDN Terminal.html` composes each from
+  runs of box-drawing line broken by knots of widgets (box-drawing joints, Misc Technical,
+  geometric shapes, blocks) and Mathematical Operators, with an end cap at each side. A few
+  glyphs churn, each mostly into its own kind, so a rule stays about 45% knots; a glitch
+  burst makes them boil; reduced motion holds them still. Rules are fitted as drawn (a knot
+  glyph from a fallback font is a little wider), so the right cap always shows.
+  `tests/phone.mjs` checks the rules, the churn, a separator's fit, and reduced motion.
+
 ### Title card, Clod's character, phones (2026-09-26)
 - **Title card** before the splash: `engine/title-card.js`, a copy of the bio site's
   `title-card.js` (the source: re-copy it from there). Modelled on a film's rating card,

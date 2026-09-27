@@ -128,11 +128,41 @@ for (let i = 0; i < 120; i++) { await sleep(500); if (/Address me/.test(await te
 const init = await evalIn("window.__initCalled");
 console.log("the model download on a phone: " + (init ? "started NO" : "not started")); if (init) bad++;
 check("boot text", await fit("#boot"));
+// the rules, drawn in characters (GLYPH RULES in the page): runs of line broken by knots of
+// widgets and mathematical symbols, each clipped to its width with its right cap in view; a
+// few glyphs churning; a separator between turns from the same hand, inside the width
+const RULES = `JSON.stringify((() => {
+  const LINE = /[─━═╌╍┄┅┈┉⎯⎺⎻⎼⎽\\-=_~ ]/, KNOT = /[\\u2200-\\u22FF\\u2300-\\u23FF\\u2500-\\u259F\\u25A0-\\u25FF]/;
+  const one = (el) => { const t = el.textContent, rg = document.createRange(); rg.selectNodeContents(el);
+    return { n: [...t].length, knots: [...t].filter((c) => KNOT.test(c) && !LINE.test(c)).length, over: Math.round(rg.getBoundingClientRect().width - el.clientWidth), text: t }; };
+  return { top: one(document.getElementById('rule-top')), bottom: one(document.getElementById('rule-bottom')) };
+})())`;
+const r1 = JSON.parse(await evalIn(RULES));
+for (const k of ["top", "bottom"]) {
+  const r = r1[k], share = r.knots / r.n, ok = r.n >= 20 && share >= 0.2 && share <= 0.7 && r.over <= 2;   // knots a fifth to two thirds of it (about 45% at rest)
+  console.log("the " + k + " rule: " + r.n + " glyphs, " + r.knots + " in knots, " + (r.over > 0 ? r.over + " px past its edge" : "its end in view") + (ok ? "" : " NO") + ": " + r.text.slice(0, 48) + "…");
+  if (!ok) bad++;
+}
+await sleep(1300);
+const r2 = JSON.parse(await evalIn(RULES)), churned = r2.top.text !== r1.top.text || r2.bottom.text !== r1.bottom.text;
+console.log("the rules churn: " + (churned ? "yes" : "NO")); if (!churned) bad++;
+const sep = JSON.parse(await evalIn(`(addSeparator(), JSON.stringify((() => { const el = [...document.querySelectorAll('#transcript .turn-rule')].pop(), rg = document.createRange(); rg.selectNodeContents(el);
+  return { n: [...el.textContent].length, right: Math.round(rg.getBoundingClientRect().right), edge: Math.round(document.getElementById('transcript').getBoundingClientRect().right), hidden: el.getAttribute('aria-hidden') }; })()))`));
+const sepOk = sep.n >= 8 && sep.right <= sep.edge + 1 && sep.hidden === "true";
+console.log("a separator between turns: " + sep.n + " glyphs, " + (sep.right <= sep.edge + 1 ? "inside the width" : (sep.right - sep.edge) + " px past it") + ", hidden from a screen reader: " + sep.hidden + (sepOk ? "" : " NO")); if (!sepOk) bad++;
 check("status bar", await fit("#statusbar, #statusbar .left, #statusbar .right"));
 check("prompt bar", await fit("#promptbar, #input, #micbtn"));
 check("terminal lines", await fit("#transcript, #transcript > *"));
 console.log("status bar: " + await text("#statusbar"));
 console.log("the terminal: " + ((await text("#transcript > *")) || "(empty)").slice(0, 400));
+// with reduced motion, the rules hold still
+await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] }, sessionId);
+await evalIn("location.reload(), true");
+for (let i = 0; i < 40; i++) { await sleep(250); if (await evalIn("document.readyState === 'complete' && !!document.getElementById('rule-top') && document.getElementById('rule-top').textContent.length > 0")) break; }
+await sleep(400);
+const s1 = await evalIn("document.getElementById('rule-top').textContent"); await sleep(1300);
+const s2 = await evalIn("document.getElementById('rule-top').textContent");
+console.log("with reduced motion the rules hold still: " + (s1 && s1 === s2 ? "yes" : "NO")); if (!(s1 && s1 === s2)) bad++;
 console.log(logs.length ? "\nconsole:\n" + logs.join("\n") : "");
 console.log("\nverdict: " + (bad ? bad + " NO" : "fits a phone, and warns it away"));
 sock.close(); chrome.kill(); await new Promise((r) => chrome.on("exit", r));

@@ -476,9 +476,21 @@
   .line.bot em, .line.bot i{ font-style:italic; }
   .line.you{ font-family:"IBM Plex Mono",monospace; font-size:.74em; letter-spacing:.02em; }
   .loader-title, .release-title{ font-family:"IM Fell English SC","VT323",serif; letter-spacing:.08em; }
-  .statusbar{ border-bottom:3px double var(--amber-dim); }
+  .statusbar{ border-bottom:0; }                     /* its rule is drawn in characters: .glyph-rule */
   .statusbar .sys{ font-family:"IM Fell English SC","VT323",serif; letter-spacing:.06em; font-size:1.05em; }
-  .promptbar{ border-top:3px double var(--amber-dim); }
+  .promptbar{ border-top:0; position:relative; }
+  /* GLYPH RULES: the terminal's horizontal lines, drawn in characters (see "GLYPH RULES"
+     in the script): runs of line broken by knots of widgets and mathematical symbols,
+     a few glyphs churning as the machine glitches. One line each, clipped at the edge,
+     in a monospace face that has these ranges (VT323 has none of them). */
+  .glyph-rule{ position:absolute; left:0; right:0; display:block; overflow:hidden; white-space:nowrap;
+    font-family:Menlo,"DejaVu Sans Mono","Cascadia Mono",Consolas,"Segoe UI Symbol","Apple Symbols",monospace;
+    font-size:14px; line-height:1.1; letter-spacing:0; color:var(--amber-dim); pointer-events:none; user-select:none;
+    text-shadow:0 0 1px rgba(var(--amber-rgb),.8), 0 0 5px rgba(var(--amber-deep-rgb),.35); }
+  .glyph-rule--top{ top:100%; margin-top:3px; }
+  .glyph-rule--bottom{ bottom:100%; margin-bottom:3px; }
+  .turn-rule{ font-family:Menlo,"DejaVu Sans Mono","Cascadia Mono",Consolas,"Segoe UI Symbol","Apple Symbols",monospace;
+    font-size:13px; letter-spacing:0; overflow:hidden; white-space:nowrap; max-width:100%; }
   .dust{
     position:absolute; inset:0; pointer-events:none; z-index:4; opacity:.22; mix-blend-mode:screen;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 .75  0 0 0 0 .45  0 0 0 9 -7.2'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -558,11 +570,13 @@
           <span id="date">--</span>
           <span id="time">--:--</span>
         </div>
+        <div class="glyph-rule glyph-rule--top" id="rule-top" aria-hidden="true"></div>
       </header>
 
       <main id="transcript" class="transcript" aria-live="polite"></main>
 
       <footer class="promptbar" id="promptbar">
+        <div class="glyph-rule glyph-rule--bottom" id="rule-bottom" aria-hidden="true"></div>
         <form id="form" autocomplete="off">
           <input id="input" type="text"
                  spellcheck="false"
@@ -943,15 +957,100 @@ function applyRaggedness(el, opts = {}){
   // entirely. Only horizontal motion anywhere in the UI.
 }
 
-function raggedSeparator(){
-  // a non-uniform dash line
-  const len = 36 + Math.floor(Math.random()*8);
-  let s = '';
-  const glyphs = ['─','─','─','─','╌','┄','╍','·',' '];
-  for (let i=0;i<len;i++){
-    s += glyphs[Math.floor(Math.random()*glyphs.length)];
+/* ===========================================================================
+ * GLYPH RULES — the terminal's horizontal lines, drawn in characters, as ASCII
+ * art draws them: under the status bar, over the prompt, and between turns.
+ * A rule is runs of LINE broken by knots of WIDGETS and MATH (now and then plain
+ * ASCII), with an end cap at each side: damage to a line, not noise. A few of
+ * the top and bottom rules' glyphs churn all the time, more as glitch.level rises
+ * (a burst makes them boil); with reduced motion they hold still. Nothing
+ * re-rolls whole: the screen's edge once did, on a timer, and read as flashing.
+ * The sets below are the one place to change what they are made of.
+ * ===========================================================================*/
+const GLYPHS = {
+  // the line: box-drawing horizontals, Misc Technical's scan lines, a little ASCII
+  line:    [...'──────━═══╌╍┄┅┈┉⎯⎺⎻⎼⎽-=_~'],
+  // widgets: box-drawing joints, Misc Technical's panel and keyboard symbols, geometric shapes, blocks
+  widgets: [...'┬┴┼╤╧╪╫╬╳├┤╞╡⌐¬⌂⌁⌬⌸⌹⌺⌻⌼⌽⌾⍉⍊⍋⍜⎔⎕⏚⏛⏤⏥⏦■□▪▫▬▭▮▯▰▱◆◇◈○◌◎●◦◊░▒▓▀▄'],
+  // Mathematical Operators
+  math:    [...'∀∂∃∅∆∇∈∉∋∏∑∓∗∘∙√∝∞∟∠∡∣∥∧∨∩∪∫∮∴∵∷∸∺∻∼∽≀≃≅≈≋≍≏≐≑≒≓≔≕≖≗≜≟≠≡≢≣≤≥≪≫⊂⊃⊆⊇⊕⊖⊗⊘⊙⊚⊛⊜⊝⊞⊟⊠⊡⊢⊣⊤⊥⊨⊩⊪⊫⋄⋅⋆⋇⋈⋉⋊⋯⋰⋱'],
+  ascii:   [...'-=_~^:.,\'`"*+#<>|/\\%&!?;'],
+  left:    [...'╞├┝╟⊢⊨‹<⌈⌊['],
+  right:   [...'╡┤┥╢⊣›>⌉⌋]'],
+};
+const pickGlyph = (set) => GLYPHS[set][Math.floor(Math.random() * GLYPHS[set].length)];
+/** A knot's glyph: mostly widgets and mathematical symbols, now and then plain ASCII. */
+const knotGlyph = () => { const q = Math.random(); return pickGlyph(q < 0.45 ? 'widgets' : q < 0.9 ? 'math' : 'ascii'); };
+/** n glyphs of rule, and what each is ('l' line, 'k' knot, 'c' a cap). `wild` (0..1+)
+ *  is how broken it is: shorter runs, bigger knots. */
+function composeRule(n, wild = 1){
+  const g = [pickGlyph('left')], kind = ['c'];
+  while (g.length < n - 1){
+    let run = 2 + Math.floor(Math.random() * (9 - 4 * Math.min(1, wild)));    // runs of 2 to 6 glyphs at wild 1, longer when calmer
+    while (run-- > 0 && g.length < n - 1){ g.push(Math.random() < 0.93 ? pickGlyph('line') : ' '); kind.push('l'); }
+    let knot = 1 + Math.floor(Math.random() * (1 + 3 * wild));                // knots of 1 to 4
+    while (knot-- > 0 && g.length < n - 1){ g.push(knotGlyph()); kind.push('k'); }
   }
-  return s;
+  g.push(pickGlyph('right')); kind.push('c');
+  return { g, kind };
+}
+/** How wide a glyph of the rule's face is, measured in it (the rules are monospace). */
+function glyphWidth(el){
+  const probe = document.createElement('span');
+  probe.textContent = '─'.repeat(40);
+  el.appendChild(probe);
+  const w = probe.getBoundingClientRect().width / 40;
+  probe.remove();
+  return w > 0 ? w : 8;
+}
+/** How far a rule's glyphs run past its edge, in pixels, as drawn. */
+function overrun(el){
+  const rg = document.createRange(); rg.selectNodeContents(el);
+  return rg.getBoundingClientRect().width - el.clientWidth;
+}
+/** Fill a rule to its width (at most `max` glyphs), its right cap always in view: a knot
+ *  glyph the face lacks comes from a fallback font, a little wider, so what was drawn is
+ *  measured and glyphs before the cap are let go until it fits. */
+function fitRule(el, wild, max){
+  if (!el || !el.clientWidth) return;
+  const n = Math.max(8, Math.min(max || Infinity, Math.floor(el.clientWidth / glyphWidth(el)) - 1));
+  const { g, kind } = composeRule(n, wild);
+  el._glyphs = g; el._kinds = kind;
+  el.textContent = g.join('');
+  while (g.length > 8 && overrun(el) > 0.5){ g.splice(g.length - 2, 1); kind.splice(kind.length - 2, 1); el.textContent = g.join(''); }
+}
+/** A few of a rule's glyphs changed, more the more the machine glitches. Each becomes
+ *  another of its own kind, now and then the other: a knot frays back into line, a
+ *  line breaks into a knot, at rates that keep a rule a little under half knots
+ *  however long it runs (at even odds it filled up with symbols in seconds). */
+function churnRule(el){
+  const g = el && el._glyphs, kind = el && el._kinds;
+  if (!g || !kind || g.length < 3) return;
+  const k = Math.round(Math.random() * (0.8 + glitch.level * 3));          // a glyph or so; a burst boils
+  for (let i = 0; i < k; i++){
+    const j = 1 + Math.floor(Math.random() * (g.length - 2));
+    if (kind[j] === 'k' && Math.random() < 0.18) kind[j] = 'l';            // 0.18 against 0.15: about 45% knots, at rest
+    else if (kind[j] === 'l' && Math.random() < 0.15) kind[j] = 'k';
+    g[j] = kind[j] === 'k' ? knotGlyph() : pickGlyph('line');
+  }
+  el.textContent = g.join('');
+}
+const RULES_STILL = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
+function startRules(){
+  const top = document.getElementById('rule-top'), bottom = document.getElementById('rule-bottom');
+  const fit = () => { fitRule(top, 1); fitRule(bottom, 1); };
+  fit();
+  let t = 0;
+  window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(fit, 150); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);   // measured again in the loaded face
+  if (!RULES_STILL) setInterval(() => { if (!document.hidden && glitch.enabled){ churnRule(top); churnRule(bottom); } }, 300);
+}
+
+startRules();                                        // the markup is above this script: the rules are there to fill
+
+function raggedSeparator(el){
+  // between turns: a calmer rule, from the same hand (GLYPH RULES, above), 36 to 44 glyphs or the width
+  fitRule(el, 0.5, 36 + Math.floor(Math.random() * 9));
 }
 
 /* ---------------- screen edge ----------------
@@ -1005,9 +1104,10 @@ function addLine(text, kind='bot', opts={}){
 function addSeparator(){
   const el = document.createElement('div');
   el.className = 'turn-rule';
-  el.textContent = raggedSeparator();
+  el.setAttribute('aria-hidden', 'true');           // a rule, not words
   el.style.setProperty('--jx', r(8) + 'px');
-  transcript.appendChild(el);
+  transcript.appendChild(el);                       // in the page first, so it has a width to fill
+  raggedSeparator(el);
 }
 
 const CORRUPT_GLYPHS = '@#%&*+=<>/\\|░▒▓█▚▞▙▟◆◇◈¤§¥¢ƒ';
