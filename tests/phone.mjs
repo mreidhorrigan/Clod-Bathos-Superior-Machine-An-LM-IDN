@@ -97,6 +97,11 @@ console.log("the title card comes before the splash: " + (first ? "yes" : "NO"))
 const cardSays = await text("#mhtc-title, .mhtc-author");
 console.log("title card: " + (cardSays || "MISSING NO")); if (!cardSays) bad++;
 check("title card", await fit(".mhtc-box, .mhtc-text, .mhtc-go, .mhtc-author"));
+// its top in reach: a card taller than the screen once had its top pushed above it
+const cardTop = await evalIn("(() => { const c = document.querySelector('.mhtc'); c.scrollTop = 0; return Math.round(Math.min(...[...c.querySelectorAll('.mhtc-lang, .mhtc-kicker, .mhtc-box')].filter((e) => !e.hidden).map((e) => e.getBoundingClientRect().top))); })()");
+console.log("the title card's top: " + (cardTop >= 0 ? "in reach (" + cardTop + " px)" : "cut off above the screen NO (" + cardTop + " px)")); if (!(cardTop >= 0)) bad++;
+const cardColour = await evalIn("document.querySelector('.mhtc').style.getPropertyValue('--mhtc-c')");
+console.log("the title card's colour: " + cardColour + (cardColour === "rgb(154,67,16)" ? " (its own burnt orange)" : " NO"));  if (cardColour !== "rgb(154,67,16)") bad++;
 // in French: the card's own switch turns it over (the address takes ?lang=fr), and the
 // card says the game itself is in English; a load with ?lang=fr opens it in French
 const fr = async (how) => {
@@ -164,11 +169,13 @@ console.log("the scrollbar in characters: native " + chars.scrollbar + ", " + (c
 // a long transcript: the column shows, its thumb at the foot when scrolled to the end, at the head when scrolled to the top
 const col = JSON.parse(await evalIn(`(async () => { for (let i = 0; i < 40; i++) addLine('line ' + i + ' of a long petition', 'sys');
   const t = document.getElementById('transcript'), bar = document.querySelector('.glyph-scroll'), wait = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-  t.scrollTop = t.scrollHeight; await wait(); const end = bar.hidden ? '' : bar.textContent.split('\\n');
+  // the opening may still be typing, so "the end" moves: scroll there again until it holds
+  for (let k = 0; k < 20; k++) { t.scrollTop = t.scrollHeight; await wait(); if (t.scrollTop + t.clientHeight >= t.scrollHeight - 2) break; }
+  const end = bar.hidden ? '' : bar.textContent.split('\\n');
   t.scrollTop = 0; await wait(); const top = bar.hidden ? '' : bar.textContent.split('\\n');
   return JSON.stringify({ end: end && end.join(''), endFoot: end && end[end.length - 1] === '█', topHead: top && top[0] === '█' }); })()`));
 const colOk = col.endFoot && col.topHead;
-console.log("a long transcript: the column shows (" + (col.end || "").slice(0, 20) + "…), thumb at the foot at the end, at the head at the top: " + (colOk ? "yes" : "NO")); if (!colOk) bad++;
+console.log("a long transcript: the column shows (" + (col.end || "").slice(0, 20) + "…), thumb at the foot at the end, at the head at the top: " + (colOk ? "yes" : "NO " + JSON.stringify(col))); if (!colOk) bad++;
 await sleep(1300);
 const r2 = JSON.parse(await evalIn(RULES)), churned = r2.top.text !== r1.top.text || r2.bottom.text !== r1.bottom.text;
 console.log("the rules churn: " + (churned ? "yes" : "NO")); if (!churned) bad++;

@@ -40,6 +40,9 @@
      by, author,        the by-line and the author's name
      left, right,       the lines in the bottom corners
      go,                the button's words ("Begin")
+     colour             the card's own colour (a dark hex: white text must read on it;
+                        each work has its own): the field's gradient, the surround and
+                        the mark are made from it; the rating card's blue if none
      also, alsoUrl      a second way on, a link beside Begin (the machine translation of
                         Rock Walls and Damp, and back): shown only in a language that has
                         words for it, so it can be French only
@@ -56,23 +59,32 @@
   const reduce = () => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
 
   const CSS = `
-  .mhtc{ position:fixed; inset:0; z-index:2147483000; overflow:auto; background:#050814; color:#fff;
-    display:grid; place-items:center; -webkit-font-smoothing:antialiased; text-shadow:none; }
+  /* centred by auto margins, not grid centring: a card taller than a phone's screen, grid-
+     centred, had its top pushed above the screen, out of reach of scrolling; with margins it
+     starts at the top and scrolls, and still centres when it fits */
+  .mhtc{ position:fixed; inset:0; z-index:2147483000; overflow:auto; background:var(--mhtc-outer,#050814); color:#fff;
+    display:flex; align-items:flex-start; font-size:16px; -webkit-font-smoothing:antialiased; text-shadow:none; }
+  /* A card stands in front of a work, whose own stylesheet may reach into it: Rock Walls
+     and Damp sets * { margin: 0 !important; font-size: 110% } and blurs every link. So
+     the card's margins are marked important, its sizes come from its own base, and its
+     links do not animate. */
+  .mhtc-field, .mhtc-weave, .mhtc-box, .mhtc-row, .mhtc-ways, .mhtc-text p, .mhtc-part p{ font-size:inherit; }
+  .mhtc a{ animation:none; filter:none; }
   .mhtc[hidden]{ display:none; }
-  .mhtc-field{ position:relative; width:min(1100px,100vw); min-height:min(640px,100vh); box-sizing:border-box;
-    background:radial-gradient(ellipse at 50% 45%, #2a45c2 0%, #1d33a3 55%, #142477 100%);
+  .mhtc-field{ position:relative; margin:auto !important; width:min(1100px,100vw); min-height:min(640px,100vh); box-sizing:border-box;
+    background:radial-gradient(ellipse at 50% 45%, var(--mhtc-light,#3a52b3) 0%, var(--mhtc-c,#1d33a3) 55%, var(--mhtc-dark,#13216a) 100%);
     display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
     padding:max(40px,env(safe-area-inset-top)) max(22px,env(safe-area-inset-right)) max(64px,env(safe-area-inset-bottom)) max(22px,env(safe-area-inset-left));
     font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; }
   .mhtc-weave{ display:flex; flex-direction:column; align-items:center; width:100%; will-change:transform; }
   .mhtc-kicker, .mhtc-by, .mhtc-author{ text-transform:uppercase; }
-  .mhtc-kicker{ margin:0 0 18px; font-weight:700; font-size:clamp(13px,1.9vw,19px); letter-spacing:.14em; }
-  .mhtc-box{ max-width:640px; width:100%; border:2px solid #fff; text-align:left; margin:0 auto; }
+  .mhtc-kicker{ margin:0 0 18px !important; font-weight:700; font-size:clamp(13px,1.9vw,19px); letter-spacing:.14em; }
+  .mhtc-box{ max-width:640px; width:100%; border:2px solid #fff; text-align:left; margin:0 auto !important; }
   .mhtc-row{ display:flex; align-items:stretch; }
-  .mhtc-mark{ flex:0 0 auto; display:flex; align-items:center; justify-content:center; padding:10px 18px; background:#fff; color:#1d33a3;
+  .mhtc-mark{ flex:0 0 auto; display:flex; align-items:center; justify-content:center; padding:10px 18px; background:#fff; color:var(--mhtc-c,#1d33a3);
     font-family:Georgia,"Times New Roman",serif; font-weight:700; font-size:clamp(34px,6vw,58px); letter-spacing:-.01em; line-height:1; }
   .mhtc-part{ padding:10px 14px; font-weight:700; font-size:clamp(11px,1.5vw,13px); line-height:1.4; letter-spacing:.02em; }
-  .mhtc-part h1{ margin:0 0 6px; font-size:clamp(14px,2vw,17px); line-height:1.25; letter-spacing:.05em; text-transform:uppercase; font-weight:700; }
+  .mhtc-part h1{ margin:0 0 6px !important; font-size:clamp(14px,2vw,17px); line-height:1.25; letter-spacing:.05em; text-transform:uppercase; font-weight:700; }
   .mhtc-part p{ margin:0; white-space:pre-line; }          /* the specs: a line each (implementation, runtime) */
   /* the card's own colour and type, whatever the page styles its headings and paragraphs as
      (the Autofac poster colours an h1 cyan, with a glow) */
@@ -80,19 +92,19 @@
     color:#fff; background:none; text-shadow:none; font-family:inherit; font-style:normal; }
   .mhtc-strip{ margin:0; border-top:2px solid #fff; padding:5px 12px; font-weight:700; font-size:clamp(11px,1.5vw,13px); letter-spacing:.03em; }
   .mhtc-strip[hidden]{ display:none; }
-  .mhtc-text{ max-width:640px; margin:18px auto 0; text-align:left; font-size:clamp(14px,1.7vw,16px); line-height:1.55; }
-  .mhtc-text p{ margin:0 0 10px; }
-  .mhtc-by{ margin:16px 0 2px; font-weight:700; font-size:clamp(13px,1.9vw,18px); letter-spacing:.14em; }
+  .mhtc-text{ max-width:640px; margin:18px auto 0 !important; text-align:left; font-size:clamp(14px,1.7vw,16px); line-height:1.55; }
+  .mhtc-text p{ margin:0 0 10px !important; }
+  .mhtc-by{ margin:16px 0 2px !important; font-weight:700; font-size:clamp(13px,1.9vw,18px); letter-spacing:.14em; }
   .mhtc-author{ margin:0; font-weight:700; font-size:clamp(26px,4.4vw,42px); letter-spacing:.08em; }
-  .mhtc-go{ margin-top:22px; appearance:none; cursor:pointer; background:transparent; color:#fff; border:2px solid #fff;
+  .mhtc-go{ margin-top:22px !important; appearance:none; cursor:pointer; background:transparent; color:#fff; border:2px solid #fff;
     padding:9px 26px; font:700 14px "Helvetica Neue",Helvetica,Arial,sans-serif; letter-spacing:.16em; text-transform:uppercase; }
-  .mhtc-also{ display:inline-block; margin:22px 0 0 12px; color:#fff; border:2px solid rgba(255,255,255,.55); padding:9px 18px;
+  .mhtc-also{ display:inline-block; margin:22px 0 0 12px !important; color:#fff; border:2px solid rgba(255,255,255,.55); padding:9px 18px;
     font:700 14px "Helvetica Neue",Helvetica,Arial,sans-serif; letter-spacing:.06em; text-decoration:none; }
   .mhtc-also[hidden]{ display:none; }
-  .mhtc-go:hover, .mhtc-lang:hover, .mhtc-also:hover{ background:#fff; color:#1d33a3; }
+  .mhtc-go:hover, .mhtc-lang:hover, .mhtc-also:hover{ background:#fff; color:var(--mhtc-c,#1d33a3); }
   .mhtc-go:focus-visible, .mhtc-lang:focus-visible, .mhtc-also:focus-visible{ outline:3px solid #c3f0ff; outline-offset:3px; }
   .mhtc-ways{ display:flex; flex-wrap:wrap; justify-content:center; align-items:center; }
-  .mhtc-status{ margin:14px 0 0; min-height:1.4em; color:#fff; font-weight:700; font-size:clamp(12px,1.6vw,14px); letter-spacing:.03em; text-shadow:none; }
+  .mhtc-status{ margin:14px 0 0 !important; min-height:1.4em; color:#fff; font-weight:700; font-size:clamp(12px,1.6vw,14px); letter-spacing:.03em; text-shadow:none; }
   .mhtc-lang{ position:absolute; z-index:2; top:max(16px,env(safe-area-inset-top)); right:max(20px,env(safe-area-inset-right));
     appearance:none; cursor:pointer; background:transparent; color:#fff; border:1px solid rgba(255,255,255,.75);
     padding:5px 11px; font:700 12px "Helvetica Neue",Helvetica,Arial,sans-serif; letter-spacing:.08em; }
@@ -105,8 +117,8 @@
   .mhtc-vignette{ background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.45) 100%); }
   @media (max-width:560px){
     .mhtc-row{ flex-direction:column; } .mhtc-mark{ padding:8px; }
-    .mhtc-lang{ position:static; align-self:flex-end; margin:0 0 14px; }
-    .mhtc-corner{ position:static; margin-top:10px; } .mhtc-field{ padding-bottom:28px; }
+    .mhtc-lang{ position:static; align-self:flex-end; margin:0 0 14px !important; }
+    .mhtc-corner{ position:static; margin-top:10px !important; } .mhtc-field{ padding-bottom:max(28px,env(safe-area-inset-bottom)); }
   }`;
 
   /** Frames of grain: a few noise tiles, each a picture, shown in turn at about 24 a second. */
@@ -169,6 +181,13 @@
     }
     const sp = speaker(o), paras = (o.text || []).length;
     const el = document.createElement("div");
+    // the card's colour: a lighter centre and a darker edge for the field, darker still round it
+    const rgb = /^#[0-9a-f]{6}$/i.test(o.colour || "") ? [1, 3, 5].map((i) => parseInt(o.colour.slice(i, i + 2), 16)) : [29, 51, 163];
+    const mixed = (to, t) => "rgb(" + rgb.map((v, i) => Math.round(v + (to[i] - v) * t)).join(",") + ")";
+    el.style.setProperty("--mhtc-c", mixed([0, 0, 0], 0));
+    el.style.setProperty("--mhtc-light", mixed([255, 255, 255], 0.12));
+    el.style.setProperty("--mhtc-dark", mixed([0, 0, 0], 0.35));
+    el.style.setProperty("--mhtc-outer", mixed([0, 0, 0], 0.8));
     el.className = "mhtc"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "mhtc-title");
     const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
     // the frame once; its words are painted in (paint, below), again whenever the language changes
