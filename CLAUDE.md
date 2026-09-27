@@ -19,7 +19,7 @@ active goal: easy/browser-side delivery) — read it first if you're picking thi
   the model; the **loading screen** waits for a click/keypress (also unlocks audio), checks for
   a WebGPU adapter, and either shows download progress with a "play now" key (the model keeps
   loading behind the game) or says plainly that the AI narrator can't run here and waits for a
-  key. The status bar always shows `NARRATOR · AI / LOADING / WRITTEN LINES`. If opened from
+  key. The status bar always shows Clod's state in the game's terms, `CLOD · LUCID / WAKING 45% / RECITING THE CHARTER` (the language model answers / is downloading / the written lines answer), with the plain words as its title. A title card (the author's words) stands in front of the splash. If opened from
   `file://`, the loader says to run `serve.py`. **Check the first-load experience with
   `node tests/first-load.mjs [url]`** (headless, no GPU; `FIRST_LOAD_MODE=slow` fakes a slow
   download).

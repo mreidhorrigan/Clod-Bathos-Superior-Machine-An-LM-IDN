@@ -33,6 +33,7 @@ SHARED = [
     "engine/speech.js",                  # speech-to-text / voice control (built-in Web Speech provider)
     "engine/providers/whisper-stt.js",   # OFFLINE STT provider (transformers.js Whisper; inert unless selected)
     "engine/vendor/samjs.js",
+    "engine/title-card.js",              # the title card before the splash (source: the bio site's title-card.js)
     "story.js",
 ]
 

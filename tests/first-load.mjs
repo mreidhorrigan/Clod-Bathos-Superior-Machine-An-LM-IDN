@@ -99,6 +99,8 @@ const record = async () => {
 console.log("First load of " + URL_ + (SLOW ? ", a WebGPU browser on a slow line (faked)" : ", with no WebGPU"));
 const first = await record();
 timeline.push(at() + "  navigator.gpu " + (first.gpu ? "exists (the adapter may still be missing)" : "is missing"));
+timeline.push(at() + "  title card: " + (await evalIn("(document.querySelector('#mhtc-title') || {}).textContent || '(none)'")));
+await evalIn("(document.querySelector('.mhtc-go') || { click() {} }).click(), true");   // Begin: on to the splash
 await evalIn("document.getElementById('loader').click(), true");      // the first gesture
 const end = Date.now() + WAIT * 1000;
 let s = first, pressed = 0;
@@ -127,7 +129,7 @@ else {
   }
   const reply = s.lines.slice(before + 1).join(" / ");
   timeline.push(at() + "  reply: " + (reply ? reply.slice(0, 300) : "(none)"));
-  if (SLOW) { for (let i = 0; i < 60 && !/NARRATOR · AI/.test(s.status); i++) { await sleep(500); s = await record(); } }
+  if (SLOW) { for (let i = 0; i < 60 && !/CLOD · LUCID/.test(s.status); i++) { await sleep(500); s = await record(); } }
 }
 const all = timeline.join("\n");
 console.log((logs.length ? "\nconsole:\n" + logs.join("\n") : ""));

@@ -6,7 +6,22 @@ works*; this file is *where things stand* and *what's next*.
 
 ---
 
-## Current state — newest first (updated 2026-09-24)
+## Current state — newest first (updated 2026-09-26)
+
+### Title card, Clod's character, phones (2026-09-26)
+- **Title card** before the splash: `engine/title-card.js`, a copy of the bio site's
+  `title-card.js` (the source: re-copy it from there). Modelled on a film's rating card,
+  with grain, flicker, weave and dust; the author's own paragraph. Its words are set in
+  the loader block of `IDN Terminal.html` (`MH_TITLE_CARD.show`). The splash takes no key
+  or tap until it goes.
+- **Clod's character** (from story.js meta.style): Clod's lines in IM Fell English (a
+  charter's face), the petitioner's small in IBM Plex Mono, the notices in VT323; a
+  double-ruled letterhead; a fine dust over the glass. The narrator state in the game's
+  terms: `CLOD · LUCID` / `CLOD · WAKING 45%` / `CLOD · RECITING THE CHARTER`, with plain
+  words as the status bar's title.
+- **Phones**: the splash warns a phone or tablet away (the model wants a computer's GPU)
+  and never starts the download there; the terminal fits a phone (status bar no longer
+  widens the page, safe areas, the on-screen keyboard). `tests/phone.mjs` checks it.
 
 ### First load: say plainly what the narrator is doing (NEWEST, 2026-09-24)
 - A visitor reported the game "neither worked nor said its models hadn't loaded".

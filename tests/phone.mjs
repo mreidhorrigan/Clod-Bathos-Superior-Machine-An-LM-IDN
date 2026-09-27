@@ -89,6 +89,13 @@ let bad = 0;
 const check = (what, list) => { console.log(what + ": " + (list && list.length ? list.join("; ") + " NO" : "fits")); if (list && list.length) bad++; };
 const text = (sel) => evalIn(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter((e) => getComputedStyle(e).display !== 'none' && !e.hidden).map((e) => e.textContent.trim()).join(' | ')`);
 console.log("Clod Bathos on a phone (390 by 844), " + URL_);
+// the title card first: what the work is, then Begin
+const cardSays = await text("#mhtc-title, .mhtc-author");
+console.log("title card: " + (cardSays || "MISSING NO")); if (!cardSays) bad++;
+check("title card", await fit(".mhtc-box, .mhtc-text, .mhtc-go, .mhtc-author"));
+await evalIn("document.querySelector('.mhtc-go').click(), true");
+const cardGone = await evalIn("!document.querySelector('.mhtc')");
+console.log("Begin: " + (cardGone ? "the card goes, the splash shows" : "the card stays NO")); if (!cardGone) bad++;
 console.log("splash says: " + await text(".loader-inner > *"));
 const warns = /computer/i.test(await text(".loader-inner > *")) && /phone/i.test(await text(".loader-inner > *"));
 console.log("splash warns a phone away: " + (warns ? "yes" : "NO")); if (!warns) bad++;

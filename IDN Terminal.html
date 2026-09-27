@@ -52,7 +52,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;700&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&display=swap" rel="stylesheet">
 <style>
   /* ════════════════════════════════════════════════════════════════════════
      CLOD PALETTE — the ONE place to retune the game's colours.
@@ -462,6 +462,28 @@
   .release-sub{ font-size:22px; margin-top:8px; letter-spacing:.12em; color:var(--release-ink-2); }
   .release-prompt{ margin-top:54px; font-size:24px; animation: promptblink 1.1s steps(1) infinite; }
 
+  /* ---------- CLOD'S CHARACTER ----------
+     The machine is a self-important old gatekeeper, its grandeur eaten by decay
+     (story.js meta.style): so its own words are set like its Charter, in the face
+     of old printed proclamations (IM Fell English), glowing amber on a dusty tube,
+     while the terminal's own notices stay terminal type and the petitioner's lines
+     stay small. The letterhead is ruled twice, as a charter's, and a fine dust
+     lies over the glass. */
+  .line.bot{
+    font-family:"IM Fell English","VT323",serif;
+    font-size:1.08em; line-height:1.38; letter-spacing:.005em;
+  }
+  .line.bot em, .line.bot i{ font-style:italic; }
+  .line.you{ font-family:"IBM Plex Mono",monospace; font-size:.74em; letter-spacing:.02em; }
+  .loader-title, .release-title{ font-family:"IM Fell English SC","VT323",serif; letter-spacing:.08em; }
+  .statusbar{ border-bottom:3px double var(--amber-dim); }
+  .statusbar .sys{ font-family:"IM Fell English SC","VT323",serif; letter-spacing:.06em; font-size:1.05em; }
+  .promptbar{ border-top:3px double var(--amber-dim); }
+  .dust{
+    position:absolute; inset:0; pointer-events:none; z-index:4; opacity:.22; mix-blend-mode:screen;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 .75  0 0 0 0 .45  0 0 0 9 -7.2'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
   @media (max-width: 640px){
     /* a phone: the notch and the home bar keep their margins (viewport-fit=cover) */
     .content{font-size:18px;
@@ -486,6 +508,9 @@
      key. That first gesture is what the browser requires before audio can start,
      so we unlock the AudioContext (and the ambient bed) THEN run boot — which is
      why the opening narration is voiced and the background is already humming. -->
+<!-- Title card: what the work is, in the author's words, in front of the splash
+     (engine/title-card.js, a copy of the bio site's; its words are set below). -->
+<script src="engine/title-card.js"></script>
 <div id="loader" class="loader" role="button" tabindex="0" aria-label="Press any key to begin">
   <div class="loader-inner">
     <div class="loader-title">IDN/OS</div>
@@ -514,6 +539,7 @@
 <div class="screen-wrap">
   <div class="screen" id="screen">
     <div class="burn"></div>
+    <div class="dust" aria-hidden="true"></div>
     <div class="sweep"></div>
     <div class="scanbar"></div>
     <div class="flicker"></div>
@@ -1646,9 +1672,12 @@ function setNarrator(state, detail){
   narrator.state = state;
   const el = document.getElementById('narrator-state'); if (!el) return;
   const dot = el.querySelector('.dot'), txt = el.querySelector('.state-text');
-  if (txt) txt.textContent = state === 'ai' ? 'NARRATOR · AI'
-    : state === 'loading' ? 'NARRATOR · LOADING' + (detail ? ' ' + detail : '')
-    : 'NARRATOR · WRITTEN LINES';
+  // in the machine's own terms: lucid (the language model answers), waking (it is
+  // still downloading), or reciting its Charter (the written lines answer); the
+  // plain words are the title, below, for whoever hovers or reads it aloud
+  if (txt) txt.textContent = state === 'ai' ? 'CLOD · LUCID'
+    : state === 'loading' ? 'CLOD · WAKING' + (detail ? ' ' + detail : '')
+    : 'CLOD · RECITING THE CHARTER';
   if (dot) dot.classList.toggle('off', state !== 'ai');
   el.title = state === 'ai' ? 'The AI narrator is answering.'
     : state === 'loading' ? 'The AI narrator is still downloading. Until it is ready, the story answers with its written lines.'
@@ -1665,11 +1694,11 @@ async function maybeWarnNoLLM(){
     if (prov === 'webllm'){
       if (narrator.state === 'ai') return;
       if (narrator.state === 'loading'){
-        addLine("NARRATOR · LOADING — the AI narrator is still downloading. Until it is ready, the story answers with its written lines.", "sys");
+        addLine("CLOD · WAKING — the AI narrator is still downloading. Until it is ready, the story answers with its written lines.", "sys");
         return;
       }
       setNarrator('offline');
-      addLine("NARRATOR · OFFLINE — the AI narrator could not load in this browser. " +
+      addLine("CLOD · RECITING THE CHARTER — the AI narrator could not load in this browser. " +
         (location.protocol === 'file:' ? "Opened from a file it needs a server: run  python3 serve.py" : (narrator.why || NO_WEBGPU)), "sys");
       addLine("  " + STILL_PLAYS, "sys");
       return;
@@ -1678,7 +1707,7 @@ async function maybeWarnNoLLM(){
     if (ok === true) setNarrator('ai');
     if (ok !== false) return;
     setNarrator('offline');
-    addLine("NARRATOR · OFFLINE — no model is answering, so the story answers with its written lines.", "sys");
+    addLine("CLOD · RECITING THE CHARTER — no model is answering, so the story answers with its written lines.", "sys");
     addLine("  start the local model:  OLLAMA_ORIGINS='*' ollama serve   ·  then /reset", "sys");
   } catch (e){ /* never block boot on the probe */ }
 }
@@ -1837,12 +1866,12 @@ async function bootSeq(){
             // played on before the model was ready: it keeps loading, and says so when it is
             modelLoad.then(() => {
               setNarrator('ai');
-              addLine("NARRATOR · ONLINE — the AI narrator has loaded, and answers from your next turn.", "sys");
+              addLine("CLOD · LUCID — the AI narrator has loaded, and answers from your next turn.", "sys");
             }, (e) => {
               console.warn('[IDN] WebLLM init failed; continuing with authored text:', e);
               narrator.why = "It needs WebGPU and enough graphics memory: Chrome or Edge on a computer.";
               setNarrator('offline');
-              addLine("NARRATOR · OFFLINE — the AI narrator could not load. " + STILL_PLAYS, "sys");
+              addLine("CLOD · RECITING THE CHARTER — the AI narrator could not load. " + STILL_PLAYS, "sys");
             });
           }
         }
@@ -1868,10 +1897,26 @@ async function bootSeq(){
     input.focus();
     bootSeq();
   }
+  // the title card comes first, as a film's card before it begins: until it goes,
+  // the splash takes no key or tap (it holds the keys, and it covers the splash)
+  const cardUp = () => !!(window.MH_TITLE_CARD && window.MH_TITLE_CARD.up());
+  if (window.MH_TITLE_CARD) window.MH_TITLE_CARD.show({
+    kicker: "This interactive digital narrative is presented",
+    mark: "LM",
+    title: "Clod Bathos, Superior Machine",
+    particulars: "An interactive digital narrative made with language models: for petitioning a pompous old machine, in writing or aloud.",
+    text: ["I created Clod Bathos as an experiment in the use of small language models to drive game dialogue. Three language models are involved: one for driving the game’s state machine as you input your dialogue decisions, one for the game’s text to speech, and one for speech to text. The character of Clod Bathos is, evidently, modeled on today’s ‘frontier’ chatbots, my premise being that some of Bathos’s ethical tuning has gone awry in the years it has been left socially abandoned."],
+    by: "By",
+    author: "M. Reid Horrigan",
+    left: "matthorrigan.com",
+    right: "2026",
+    go: "Begin",
+    onClose: () => loader.focus({ preventScroll: true }),
+  });
   loader.addEventListener('click', startExperience);
   loader.addEventListener('touchstart', startExperience, { passive: true });
   window.addEventListener('keydown', (e) => {
-    if (started) return;
+    if (started || cardUp()) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;  // let browser/OS shortcuts through
     e.preventDefault();                              // don't leak the starting key into the input
     startExperience();
