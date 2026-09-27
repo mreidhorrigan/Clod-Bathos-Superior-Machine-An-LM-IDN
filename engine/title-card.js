@@ -5,28 +5,50 @@
    ----------------------------------------------------------------------------
    A card in front of a work's own first screen, modelled on the card a film
    shows before it begins (a rating card): a saturated blue field, white capitals
-   centred, a ruled box with a large mark on its left and the work's particulars
-   on its right, the author's words, "by" and the author's name, and a line in
-   each bottom corner. The picture is a film's: a moving grain, a slight flicker,
-   the frame weaving a little in the gate, now and then a fleck of dust, and the
-   corners darker. With reduced motion the grain holds still and nothing moves.
+   centred, a ruled box with a large mark on its left, the work's particulars on
+   its right and a strip of small print along its foot, the author's words, "by"
+   and the author's name, and a line in each bottom corner. The picture is a
+   film's: a moving grain, a slight flicker, the frame weaving a little in the
+   gate, now and then a fleck of dust, and the corners darker. With reduced
+   motion the grain holds still and nothing moves.
 
    It is its own: it brings its styles and needs nothing else on the page, so the
-   same file serves this site (Rock Walls and Damp) and Clod Bathos, deployed on
-   its own (a copy there: engine/title-card.js; this one is the source).
+   same file serves this site (Rock Walls and Damp, Autofac) and Clod Bathos,
+   deployed on its own (a copy there: engine/title-card.js; this one is the source).
+
+   IN ENGLISH OR FRENCH. The works themselves are in English. The card speaks the
+   reader's language, and in French says in its strip that the work is in English
+   (`note`: nothing in English, where it would go without saying). While it is up
+   it carries its own switch, as it covers the page's.
+     On this site its words come from i18n.js, by key (titlecard.<id>.<field>, and
+     titlecard.by / titlecard.go for all the cards), so the French lives in
+     i18n-fr.js with every other French word, and the card follows the site's
+     switch. A page of its own (Clod Bathos) brings its French in `fr`, and the
+     card takes it when the address asks, ?lang=fr, as the site's links do.
+     Names stay as they are in either language: the title, the mark, the author.
 
    MH_TITLE_CARD.show({
+     id,                on this site: the card's name in i18n-fr.js ("rockwalls")
      kicker,            the line above the box ("This interactive digital narrative
                         is presented"), set in capitals as the by-line and name are
      mark,              the box's large letters (the kind of work: "LM")
      title,             the work's title, first in the box
-     particulars,       the box's small lines after it (a string)
+     particulars,       the box's small lines after the title: the specs, a line
+                        each ("Implementation: …\nRuntime: …"), no other prose
+     note,              the strip along the box's foot (English: none)
      text,              the author's words: [paragraph, …]
      by, author,        the by-line and the author's name
      left, right,       the lines in the bottom corners
      go,                the button's words ("Begin")
+     also, alsoUrl      a second way on, a link beside Begin (the machine translation of
+                        Rock Walls and Damp, and back): shown only in a language that has
+                        words for it, so it can be French only
+     fr,                a page of its own: { kicker, particulars, note, text: […],
+                        by, go, label, switchLabel }, the French of the above
      onClose            called when the card goes (Begin, Enter, Space, Escape)
-   })                   → { close, up }
+   })                   → { close, up, status(text) }: status writes a live line under
+                        Begin, read out politely (the CGSA card: the server waking);
+                        the page gives it words in the reader's language
    MH_TITLE_CARD.up()   whether a card is up (a page holds its own keys meanwhile)
    ========================================================================== */
 (function () {
@@ -45,20 +67,36 @@
   .mhtc-weave{ display:flex; flex-direction:column; align-items:center; width:100%; will-change:transform; }
   .mhtc-kicker, .mhtc-by, .mhtc-author{ text-transform:uppercase; }
   .mhtc-kicker{ margin:0 0 18px; font-weight:700; font-size:clamp(13px,1.9vw,19px); letter-spacing:.14em; }
-  .mhtc-box{ display:flex; align-items:stretch; max-width:640px; width:100%; border:2px solid #fff; text-align:left; margin:0 auto; }
+  .mhtc-box{ max-width:640px; width:100%; border:2px solid #fff; text-align:left; margin:0 auto; }
+  .mhtc-row{ display:flex; align-items:stretch; }
   .mhtc-mark{ flex:0 0 auto; display:flex; align-items:center; justify-content:center; padding:10px 18px; background:#fff; color:#1d33a3;
     font-family:Georgia,"Times New Roman",serif; font-weight:700; font-size:clamp(34px,6vw,58px); letter-spacing:-.01em; line-height:1; }
-  .mhtc-part{ padding:10px 14px; font-weight:700; font-size:clamp(11px,1.5vw,13px); line-height:1.35; letter-spacing:.06em; text-transform:uppercase; }
-  .mhtc-part h1{ margin:0 0 6px; font-size:clamp(14px,2vw,17px); line-height:1.25; letter-spacing:.05em; }
-  .mhtc-part p{ margin:0; }
+  .mhtc-part{ padding:10px 14px; font-weight:700; font-size:clamp(11px,1.5vw,13px); line-height:1.4; letter-spacing:.02em; }
+  .mhtc-part h1{ margin:0 0 6px; font-size:clamp(14px,2vw,17px); line-height:1.25; letter-spacing:.05em; text-transform:uppercase; font-weight:700; }
+  .mhtc-part p{ margin:0; white-space:pre-line; }          /* the specs: a line each (implementation, runtime) */
+  /* the card's own colour and type, whatever the page styles its headings and paragraphs as
+     (the Autofac poster colours an h1 cyan, with a glow) */
+  .mhtc-part h1, .mhtc-part p, .mhtc-kicker, .mhtc-strip, .mhtc-text p, .mhtc-by, .mhtc-author, .mhtc-corner{
+    color:#fff; background:none; text-shadow:none; font-family:inherit; font-style:normal; }
+  .mhtc-strip{ margin:0; border-top:2px solid #fff; padding:5px 12px; font-weight:700; font-size:clamp(11px,1.5vw,13px); letter-spacing:.03em; }
+  .mhtc-strip[hidden]{ display:none; }
   .mhtc-text{ max-width:640px; margin:18px auto 0; text-align:left; font-size:clamp(14px,1.7vw,16px); line-height:1.55; }
   .mhtc-text p{ margin:0 0 10px; }
   .mhtc-by{ margin:16px 0 2px; font-weight:700; font-size:clamp(13px,1.9vw,18px); letter-spacing:.14em; }
   .mhtc-author{ margin:0; font-weight:700; font-size:clamp(26px,4.4vw,42px); letter-spacing:.08em; }
   .mhtc-go{ margin-top:22px; appearance:none; cursor:pointer; background:transparent; color:#fff; border:2px solid #fff;
     padding:9px 26px; font:700 14px "Helvetica Neue",Helvetica,Arial,sans-serif; letter-spacing:.16em; text-transform:uppercase; }
-  .mhtc-go:hover{ background:#fff; color:#1d33a3; }
-  .mhtc-go:focus-visible{ outline:3px solid #c3f0ff; outline-offset:3px; }
+  .mhtc-also{ display:inline-block; margin:22px 0 0 12px; color:#fff; border:2px solid rgba(255,255,255,.55); padding:9px 18px;
+    font:700 14px "Helvetica Neue",Helvetica,Arial,sans-serif; letter-spacing:.06em; text-decoration:none; }
+  .mhtc-also[hidden]{ display:none; }
+  .mhtc-go:hover, .mhtc-lang:hover, .mhtc-also:hover{ background:#fff; color:#1d33a3; }
+  .mhtc-go:focus-visible, .mhtc-lang:focus-visible, .mhtc-also:focus-visible{ outline:3px solid #c3f0ff; outline-offset:3px; }
+  .mhtc-ways{ display:flex; flex-wrap:wrap; justify-content:center; align-items:center; }
+  .mhtc-status{ margin:14px 0 0; min-height:1.4em; color:#fff; font-weight:700; font-size:clamp(12px,1.6vw,14px); letter-spacing:.03em; text-shadow:none; }
+  .mhtc-lang{ position:absolute; z-index:2; top:max(16px,env(safe-area-inset-top)); right:max(20px,env(safe-area-inset-right));
+    appearance:none; cursor:pointer; background:transparent; color:#fff; border:1px solid rgba(255,255,255,.75);
+    padding:5px 11px; font:700 12px "Helvetica Neue",Helvetica,Arial,sans-serif; letter-spacing:.08em; }
+  .mhtc-lang[hidden]{ display:none; }
   .mhtc-corner{ position:absolute; bottom:max(20px,env(safe-area-inset-bottom)); font-weight:700; font-size:clamp(11px,1.5vw,14px); letter-spacing:.02em; }
   .mhtc-left{ left:max(26px,env(safe-area-inset-left)); } .mhtc-right{ right:max(26px,env(safe-area-inset-right)); }
   .mhtc-grain, .mhtc-flicker, .mhtc-vignette, .mhtc-dust{ position:absolute; inset:0; pointer-events:none; }
@@ -66,7 +104,8 @@
   .mhtc-flicker{ background:#000; opacity:0; }
   .mhtc-vignette{ background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.45) 100%); }
   @media (max-width:560px){
-    .mhtc-box{ flex-direction:column; } .mhtc-mark{ padding:8px; }
+    .mhtc-row{ flex-direction:column; } .mhtc-mark{ padding:8px; }
+    .mhtc-lang{ position:static; align-self:flex-end; margin:0 0 14px; }
     .mhtc-corner{ position:static; margin-top:10px; } .mhtc-field{ padding-bottom:28px; }
   }`;
 
@@ -88,35 +127,103 @@
     return out;
   }
 
+  /** Who gives the card its words: i18n.js on this site (by key, following the
+   *  site's switch), or the card's own `fr` on a page of its own (by ?lang=).
+   *  word(field, english): the field in the reader's language, English where there
+   *  is no translation; offer(): what the switch leads to, or null; set(code). */
+  function speaker(o) {
+    const I = /** @type {any} */ (window).MH_I18N;
+    if (I && o.id) return {
+      site: true,
+      lang: () => I.lang,
+      word: (field, en) => I.t("titlecard." + o.id + "." + field, field === "by" || field === "go" ? I.t("titlecard." + field, en) : en),
+      offer: () => { const n = I.offer ? I.offer() : null; return n && n.known ? n : null; },
+      set: (code) => I.set(code),
+    };
+    const fr = o.fr || null;
+    let lang = "en";
+    try { const q = new URLSearchParams(location.search).get("lang"); if (fr && q && q.trim().toLowerCase().slice(0, 2) === "fr") lang = "fr"; } catch (e) { /* English */ }
+    return {
+      site: false,
+      lang: () => lang,
+      word: (field, en) => {
+        if (lang !== "fr" || !fr) return en;
+        const n = /^text(\d+)$/.exec(field), v = n ? (fr.text || [])[+n[1]] : fr[field];
+        return v == null ? en : v;
+      },
+      offer: () => !fr ? null : lang === "fr" ? { code: "en", text: "English", aria: "Switch to English" }
+        : { code: "fr", text: fr.label || "Français", aria: fr.switchLabel || "Passer en français" },
+      set: (code) => {
+        lang = code === "fr" && fr ? "fr" : "en";
+        // window.history, by name: a page may have a global of its own called history (Clod Bathos keeps
+        // its dialogue in one), and a top-level const in any classic script hides the browser's from all of them
+        try { const u = new URL(location.href); u.searchParams.set("lang", lang); window.history.replaceState(window.history.state, "", u.href); } catch (e) { /* the card still switches */ }
+      },
+    };
+  }
+
   function show(o) {
     if (current) current.close();
     if (!document.getElementById("mhtc-style")) {
       const st = document.createElement("style"); st.id = "mhtc-style"; st.textContent = CSS; document.head.appendChild(st);
     }
+    const sp = speaker(o), paras = (o.text || []).length;
     const el = document.createElement("div");
     el.className = "mhtc"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "mhtc-title");
     const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+    // the frame once; its words are painted in (paint, below), again whenever the language changes
     el.innerHTML = `<div class="mhtc-field">
+      <button type="button" class="mhtc-lang mh-langbtn" hidden></button>
       <div class="mhtc-weave">
-        ${o.kicker ? `<p class="mhtc-kicker">${esc(o.kicker)}</p>` : ""}
+        <p class="mhtc-kicker" data-f="kicker"></p>
         <div class="mhtc-box">
-          <div class="mhtc-mark" aria-hidden="true">${esc(o.mark || "")}</div>
-          <div class="mhtc-part"><h1 id="mhtc-title">${esc(o.title)}</h1>${o.particulars ? `<p>${esc(o.particulars)}</p>` : ""}</div>
+          <div class="mhtc-row">
+            <div class="mhtc-mark" aria-hidden="true">${esc(o.mark || "")}</div>
+            <div class="mhtc-part"><h1 id="mhtc-title" lang="en">${esc(o.title)}</h1><p data-f="particulars"></p></div>
+          </div>
+          <p class="mhtc-strip" data-f="note" hidden></p>
         </div>
-        <div class="mhtc-text">${(o.text || []).map((p) => `<p>${esc(p)}</p>`).join("")}</div>
-        ${o.by ? `<p class="mhtc-by">${esc(o.by)}</p>` : ""}
+        <div class="mhtc-text">${Array.from({ length: paras }, (_, i) => `<p data-f="text${i}"></p>`).join("")}</div>
+        <p class="mhtc-by" data-f="by"></p>
         ${o.author ? `<p class="mhtc-author">${esc(o.author)}</p>` : ""}
-        <button type="button" class="mhtc-go">${esc(o.go || "Begin")}</button>
+        <div class="mhtc-ways"><button type="button" class="mhtc-go" data-f="go"></button><a class="mhtc-also" data-f="also" hidden></a></div>
+        <p class="mhtc-status" role="status" aria-live="polite"></p>
       </div>
-      ${o.left ? `<span class="mhtc-corner mhtc-left">${esc(o.left)}</span>` : ""}
-      ${o.right ? `<span class="mhtc-corner mhtc-right">${esc(o.right)}</span>` : ""}
+      <span class="mhtc-corner mhtc-left" data-f="left"></span>
+      <span class="mhtc-corner mhtc-right" data-f="right"></span>
       <div class="mhtc-grain" aria-hidden="true"></div><div class="mhtc-dust" aria-hidden="true"></div>
       <div class="mhtc-flicker" aria-hidden="true"></div><div class="mhtc-vignette" aria-hidden="true"></div>
     </div>`;
     document.body.appendChild(el);
     const grain = /** @type {HTMLElement} */ (el.querySelector(".mhtc-grain")), flicker = /** @type {HTMLElement} */ (el.querySelector(".mhtc-flicker"));
     const weave = /** @type {HTMLElement} */ (el.querySelector(".mhtc-weave")), dust = /** @type {HTMLElement} */ (el.querySelector(".mhtc-dust"));
-    const btn = /** @type {HTMLButtonElement} */ (el.querySelector(".mhtc-go"));
+    const btn = /** @type {HTMLButtonElement} */ (el.querySelector(".mhtc-go")), sw = /** @type {HTMLButtonElement} */ (el.querySelector(".mhtc-lang"));
+    const also = /** @type {HTMLAnchorElement} */ (el.querySelector(".mhtc-also"));
+
+    // the words, in the reader's language; a field with none (the note, in English) is not shown
+    const english = (f) => { const n = /^text(\d+)$/.exec(f); return n ? (o.text || [])[+n[1]] : f === "go" ? (o.go || "Begin") : o[f]; };
+    function paint() {
+      el.setAttribute("lang", sp.lang());                      // so a screen reader reads the card in its language (the page may stay English)
+      for (const node of el.querySelectorAll("[data-f]")) {
+        const f = node.getAttribute("data-f") || "", words = sp.word(f, english(f) || "");
+        node.textContent = words;
+        /** @type {HTMLElement} */ (node).hidden = !words;
+      }
+      if (o.alsoUrl) {                                         // the second way on, in the reader's language (i18n.js: ?lang= carried)
+        const I = /** @type {any} */ (window).MH_I18N;
+        also.setAttribute("href", I && I.href ? I.href(o.alsoUrl) : o.alsoUrl);
+      } else also.hidden = true;
+      const next = sp.offer();
+      sw.hidden = !next;
+      if (next) {                                              // written in the language it leads to, as the site's switch is
+        sw.textContent = next.text; sw.setAttribute("lang", next.code);
+        sw.setAttribute("aria-label", next.aria); sw.title = next.aria; sw.dataset.code = next.code;
+      }
+    }
+    paint();
+    const repaint = () => { if (el.isConnected) paint(); };
+    document.addEventListener("mh:lang", repaint);             // the site's switch, or the card's own on this site
+    sw.addEventListener("click", () => { sp.set(sw.dataset.code || "en"); if (!sp.site) paint(); });
 
     // the film running: a grain frame each 1/24 s, a flicker, the weave, a fleck of dust now and then
     const still = reduce(), frames = grainFrames(still ? 1 : 6);
@@ -143,22 +250,32 @@
       if (!el.isConnected) return;
       clearInterval(timer); el.remove(); if (current === api) current = null;
       document.removeEventListener("keydown", onKey, true); document.removeEventListener("focusin", keepFocus, true);
+      document.removeEventListener("mh:lang", repaint);
       if (o.onClose) o.onClose(); else if (prevFocus && prevFocus.focus) prevFocus.focus();
     };
-    // its keys are its own while it is up: Enter, Space or Escape close it, and nothing reaches the work under it
+    // its keys are its own while it is up, and nothing reaches the work under it: Escape
+    // closes it, and Enter or Space too, except on the language switch or the second way,
+    // which they press; Tab goes round its buttons
     const onKey = (e) => {
-      if (e.key === "Escape" || e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); close(); return; }
-      if (e.key === "Tab") { e.preventDefault(); btn.focus(); return; }
+      const own = e.target === sw || e.target === also;           // the switch and the second way: Enter and Space are theirs
+      if (e.key === "Escape" || ((e.key === "Enter" || e.key === " ") && !own)) { e.preventDefault(); e.stopPropagation(); close(); return; }
+      if (e.key === "Tab") {
+        e.preventDefault(); e.stopPropagation();
+        const stops = [sw, btn, also].filter((b) => !b.hidden), i = stops.indexOf(/** @type {any} */ (document.activeElement));
+        (i < 0 ? btn : stops[(i + (e.shiftKey ? stops.length - 1 : 1)) % stops.length]).focus();
+        return;
+      }
       if (!e.metaKey && !e.ctrlKey && !e.altKey) e.stopPropagation();
     };
     document.addEventListener("keydown", onKey, true);
     // and the focus: a work starting under it (SugarCube) takes the focus as it starts; while the card is up it comes back
     const keepFocus = (e) => { if (el.isConnected && !el.contains(/** @type {Node} */ (e.target))) btn.focus({ preventScroll: true }); };
     document.addEventListener("focusin", keepFocus, true);
-    window.addEventListener("load", () => { if (el.isConnected) btn.focus({ preventScroll: true }); }, { once: true });
+    window.addEventListener("load", () => { if (el.isConnected && !el.contains(document.activeElement)) btn.focus({ preventScroll: true }); }, { once: true });
     btn.addEventListener("click", close);
     setTimeout(() => btn.focus({ preventScroll: true }), 0);
-    const api = { close, up: () => el.isConnected };
+    const line = /** @type {HTMLElement} */ (el.querySelector(".mhtc-status"));
+    const api = { close, up: () => el.isConnected, status: (text) => { line.textContent = text || ""; } };
     current = api;
     return api;
   }

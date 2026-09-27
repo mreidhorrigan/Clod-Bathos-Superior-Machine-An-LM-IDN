@@ -93,6 +93,25 @@ console.log("Clod Bathos on a phone (390 by 844), " + URL_);
 const cardSays = await text("#mhtc-title, .mhtc-author");
 console.log("title card: " + (cardSays || "MISSING NO")); if (!cardSays) bad++;
 check("title card", await fit(".mhtc-box, .mhtc-text, .mhtc-go, .mhtc-author"));
+// in French: the card's own switch turns it over (the address takes ?lang=fr), and the
+// card says the game itself is in English; a load with ?lang=fr opens it in French
+const fr = async (how) => {
+  const r = JSON.parse(await evalIn(`JSON.stringify({ lang: document.querySelector('.mhtc').getAttribute('lang'),
+    kicker: document.querySelector('.mhtc-kicker').textContent, go: document.querySelector('.mhtc-go').textContent,
+    strip: document.querySelector('.mhtc-strip').hidden ? '' : document.querySelector('.mhtc-strip').textContent,
+    url: location.search })`));
+  const ok = r.lang === "fr" && /^Ce /.test(r.kicker) && r.go === "Commencer" && /anglais/.test(r.strip) && /lang=fr/.test(r.url);
+  console.log("French card, " + how + ": " + (ok ? "yes (\"" + r.strip + "\")" : "NO " + JSON.stringify(r))); if (!ok) bad++;
+};
+await evalIn("document.querySelector('.mhtc-lang').click(), true");
+await fr("by its switch");
+await evalIn("location.reload(), true");
+for (let i = 0; i < 40; i++) { await sleep(250); if (await evalIn("!!document.querySelector('.mhtc') && document.readyState === 'complete'")) break; }
+await sleep(500);
+await fr("by ?lang=fr");
+await evalIn("document.querySelector('.mhtc-lang').click(), true");
+const backEn = await evalIn("document.querySelector('.mhtc').getAttribute('lang') === 'en' && document.querySelector('.mhtc-strip').hidden && document.querySelector('.mhtc-go').textContent === 'Begin'");
+console.log("back to English: " + (backEn ? "yes, and no strip" : "NO")); if (!backEn) bad++;
 await evalIn("document.querySelector('.mhtc-go').click(), true");
 const cardGone = await evalIn("!document.querySelector('.mhtc')");
 console.log("Begin: " + (cardGone ? "the card goes, the splash shows" : "the card stays NO")); if (!cardGone) bad++;
